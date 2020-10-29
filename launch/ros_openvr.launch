@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+   <arg name="axis_mode" value="back" />
+
+   <param name="axis_mode" value="$(arg axis_mode)"/>
+   <node pkg="openvr_ros" type="publish_goals" name="openvr_ros" output="screen"/>
+</launch>
