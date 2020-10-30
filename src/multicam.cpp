@@ -22,9 +22,9 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#include "openvr_ros/json.hpp"
-#include "openvr_ros/multicam.hpp"
-#include "openvr_ros/shader.hpp"
+#include "multicam_mimicry/json.hpp"
+#include "multicam_mimicry/multicam.hpp"
+#include "multicam_mimicry/shader.hpp"
 
 
 #define PORT        8080 
@@ -32,8 +32,8 @@
 #define LOOPRATE    120
 #define CONTR_NAME  "vive_controller"
 
-#define WIN_HEIGHT  600
-#define WIN_WIDTH   800
+#define WIN_HEIGHT  900
+#define WIN_WIDTH   1200
 
 using json = nlohmann::json;
 using EEPoseGoals = relaxed_ik::EEPoseGoals;
@@ -41,7 +41,7 @@ using Pose = geometry_msgs::Pose;
 using Bool = std_msgs::Bool;
 using ControllerInput = goal_publisher::ControllerInput;
 
-#define MAX_TEX_SIZE 1024 * 1024
+int tex_size = 1024 * 1024;
 GLubyte* tex_buffer;
 ControllerInput::ActiveCamera active_cam = ControllerInput::STATIC;
 
@@ -229,16 +229,13 @@ void dynamicImageCb(const sensor_msgs::ImageConstPtr& msg, ControllerInput& inpu
 
     cv::Mat image = cur_img->image;
     int data_size = image.cols * image.rows * image.channels();
+    if (data_size > tex_size) {
+        delete[] tex_buffer;
+        tex_size = data_size;
+        tex_buffer = new GLubyte[tex_size];
+    }
     memcpy(tex_buffer, cur_img->image.data, data_size);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.cols, image.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)tex_buffer);         
-    
-
-    // if (!input.dyn_init)
-    // {
-    //     input.dyn_init = true;
-    //     glPixelStorei(GL_UNPACK_ALIGNMENT, (input.dyn_img->image.step & 3) ? 1 : 4);
-    //     glPixelStorei(GL_UNPACK_ROW_LENGTH, input.dyn_img->image.step / input.dyn_img->image.elemSize());
-    // }
 }
 
 void staticImageCb(const sensor_msgs::ImageConstPtr& msg, ControllerInput& input)
@@ -266,6 +263,11 @@ void staticImageCb(const sensor_msgs::ImageConstPtr& msg, ControllerInput& input
 
     cv::Mat image = cur_img->image;
     int data_size = image.cols * image.rows * image.channels();
+    if (data_size > tex_size) {
+        delete[] tex_buffer;
+        tex_size = data_size;
+        tex_buffer = new GLubyte[tex_size];
+    }
     memcpy(tex_buffer, cur_img->image.data, data_size);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.cols, image.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)tex_buffer);
 }
@@ -385,7 +387,8 @@ int main(int argc, char *argv[])
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     ImGui::StyleColorsDark();
 
     // Setup Platform/Renderer backends
@@ -459,8 +462,8 @@ int main(int argc, char *argv[])
 
     bg_shader.setInt("Texture", 0);
 
-    tex_buffer = new GLubyte[MAX_TEX_SIZE];
-    memset(tex_buffer, 0, MAX_TEX_SIZE);
+    tex_buffer = new GLubyte[tex_size];
+    memset(tex_buffer, 0, tex_size);
 
     char buff[200];
     getcwd(buff, 200);

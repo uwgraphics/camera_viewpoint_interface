@@ -18,7 +18,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include "openvr_ros/shader.hpp"
+#include "multicam_mimicry/shader.hpp"
 
 
 namespace goal_publisher
