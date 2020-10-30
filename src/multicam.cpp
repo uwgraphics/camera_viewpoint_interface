@@ -349,7 +349,6 @@ int main(int argc, char *argv[])
 
     // TEST
     ros::Publisher marker_pub(n.advertise<visualization_msgs::Marker>("visualization_marker", 1000));
-    // ros::Publisher marker_pub2(n.advertise<visualization_msgs::Marker>("visualization_marker2", 1000));
     ros::Publisher ee_pub(n.advertise<relaxed_ik::EEPoseGoals>("/relaxed_ik/ee_pose_goals", 1000));
     ros::Publisher gripper_pub(n.advertise<std_msgs::Bool>("/relaxed_ik/gripper_state", 1000));
     ros::Publisher reset_pub(n.advertise<std_msgs::Bool>("/relaxed_ik/reset_pose", 1000));
@@ -459,15 +458,10 @@ int main(int argc, char *argv[])
     
     Shader bg_shader("resources/shaders/bg_shader.vert", "resources/shaders/bg_shader.frag");
     bg_shader.use();
-
     bg_shader.setInt("Texture", 0);
 
     tex_buffer = new GLubyte[tex_size];
     memset(tex_buffer, 0, tex_size);
-
-    char buff[200];
-    getcwd(buff, 200);
-    std::cout << buff << std::endl;
 
     ros::Rate loop_rate(LOOPRATE);
     while (ros::ok() && !glfwWindowShouldClose(window))
@@ -525,33 +519,6 @@ int main(int argc, char *argv[])
         pose.orientation.y = input.orientation.y;
         pose.orientation.z = input.orientation.z;
         pose.orientation.w = input.orientation.w;
-
-
-        // TEST -------------------------------------------
-        glm::vec3 adjusted_target = glm::vec3(input.position.x, input.position.y, input.position.z); // + input.init_pos;
-
-        visualization_msgs::Marker marker;
-        marker.pose.position.x = adjusted_target.x;
-        marker.pose.position.y = adjusted_target.y;
-        marker.pose.position.z = adjusted_target.z;
-        marker.pose.orientation.x = input.orientation.x;
-        marker.pose.orientation.y = input.orientation.y;
-        marker.pose.orientation.z = input.orientation.z;
-        marker.pose.orientation.w = input.orientation.w;
-        marker.header.frame_id = "common_world";
-        marker.header.stamp = ros::Time::now();
-        marker.type = visualization_msgs::Marker::SPHERE;
-        marker.color.a = 1.0;
-        marker.color.r = 1.0;
-        marker.color.g = 0.1;
-        marker.color.b = 1.0;
-        marker.scale.y = 0.05;
-        marker.scale.z = 0.05;
-        marker.scale.x = 0.05;
-
-        marker_pub.publish(marker);
-
-        // ------------------------------------------------
 
         Pose pose_cam;
         pose_cam.position.x = input.manual_offset.x;
