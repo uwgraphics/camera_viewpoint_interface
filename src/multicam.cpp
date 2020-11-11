@@ -2,7 +2,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include "ros/ros.h"
 #include <geometry_msgs/Pose.h>
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/Image.h>
@@ -27,25 +26,92 @@
 #include "multicam_mimicry/shader.hpp"
 
 
-#define PORT        8080 
-#define MAXLINE     2048
-#define LOOPRATE    120
-#define CONTR_NAME  "vive_controller"
-
-#define WIN_HEIGHT  900
-#define WIN_WIDTH   1200
-
 using json = nlohmann::json;
 using EEPoseGoals = relaxed_ik::EEPoseGoals;
 using Pose = geometry_msgs::Pose;
 using Bool = std_msgs::Bool;
-using ControllerInput = goal_publisher::ControllerInput;
+using App = multicam::App;
+using Mesh = multicam::Mesh;
+using Image = multicam::Image;
+using Socket = multicam::Socket;
 
-int tex_size = 1024 * 1024;
-GLubyte* tex_buffer;
-ControllerInput::ActiveCamera active_cam = ControllerInput::STATIC;
+
+// void cameraCallback(const geometry_msgs::Pose::ConstPtr& msg, ControllerInput& input)
+// {
+//     auto pos = msg->position;
+//     auto quat = msg->orientation;
+//     input.cam_pos = glm::vec3(pos.x, pos.y, pos.z);
+//     input.cam_orient = glm::quat(quat.w, quat.x, quat.y, quat.z);
+// }
 
 
+
+/**
+ * Entry point to the application.
+ */
+int main(int argc, char *argv[])
+{    
+    App app = App();
+    app.run(argc, argv);
+    return 0;
+
+
+
+    // Get initial values
+    // std::string data;
+    // data = getData(sock, buffer, addr, len);
+    // parseInput(data, input);
+
+    
+    // while (ros::ok() && !glfwWindowShouldClose(window))
+    {
+
+
+        // data = getData(sock, buffer, addr, len);
+        // parseInput(data, input);
+
+        // printText(input.to_str(true));
+
+        // EEPoseGoals goal;
+        // Pose pose;
+        // pose.position.x = input.position.x;
+        // pose.position.y = input.position.y;
+        // pose.position.z = input.position.z;
+
+        // pose.orientation.x = input.orientation.x;
+        // pose.orientation.y = input.orientation.y;
+        // pose.orientation.z = input.orientation.z;
+        // pose.orientation.w = input.orientation.w;
+
+        // Pose pose_cam;
+        // pose_cam.position.x = input.manual_offset.x;
+        // pose_cam.position.y = input.manual_offset.y;
+        // pose_cam.position.z = input.manual_offset.z;
+
+        // pose_cam.orientation.x = 0.0;
+        // pose_cam.orientation.y = 0.0;
+        // pose_cam.orientation.z = 0.0;
+        // pose_cam.orientation.w = 1.0;
+
+        // goal.header.stamp = ros::Time::now();
+        // goal.ee_poses.push_back(pose);
+        // goal.ee_poses.push_back(pose_cam);
+
+        // ee_pub.publish(goal);
+
+        // input.prev_pos = glm::vec3(input.position.x, input.position.y, input.position.z);
+
+
+        // Bool gripping;
+        // gripping.data = input.gripping.is_on();
+
+        // gripper_pub.publish(gripping);        
+
+    }
+
+}
+
+// -- Helper functions --
 /**
  * Print a string to the screen.
  * 
@@ -55,7 +121,7 @@ ControllerInput::ActiveCamera active_cam = ControllerInput::STATIC;
  * 		flush - whether to flush text. Generally, only needed when
  * 			printing a large body of text with manual newlines
  */
-void printText(std::string text="", int newlines=1, bool flush=false)
+void printText(std::string text, int newlines, bool flush)
 {
     // TODO: Consider adding param for width of text line
     std::cout << text;
@@ -76,22 +142,199 @@ void printText(std::string text="", int newlines=1, bool flush=false)
     return;
 }
 
-void glfw_error_callback(int code, const char* description)
+void mismatchCameras(uint &cam1, uint &cam2, uint size)
 {
-    printText("GLFW Error: " + code);
-    printText(description);
+    if (cam1 == cam2) {
+        cam2 = (cam2 + 1) % size;
+    }
 }
 
+void nextCamera(uint &active, uint &pip, uint size)
+{
+    active = (active + 1) % size;
+    mismatchCameras(active, pip, size);
+}
+
+bool App::parseCameraFile()
+{
+    std::ifstream cam_file;
+    std::stringstream config_data;
+    
+    cam_file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try { 
+        cam_file.open(app_params.cam_config_file);
+        config_data << cam_file.rdbuf();
+        cam_file.close();
+    }
+    catch (std::ifstream::failure& e)
+    {
+        printText("Error reading camera config file: ", 0);
+        printText(e.what());
+        return false;
+    }
+
+
+    json j = json::parse(config_data.str());
+
+    uint max_width = 0, max_height = 0, max_channels = 0;
+    uint num_cams = j["_num_cams"];
+    for (uint i = 0; i < num_cams; i++) {
+        std::string cam_id = "cam" + std::to_string(i);
+        std::string name, topic_name;
+        uint w, h, c;
+
+        name = j[cam_id]["name"];
+        topic_name = j[cam_id]["topic"];
+        w = j[cam_id]["width"];
+        h = j[cam_id]["height"];
+        c = j[cam_id]["channels"];
+
+        if (w > max_width) {
+            max_width = w;
+        }
+        if (h > max_height) {
+            max_height = h;
+        }
+        if (c > max_channels) {
+            max_channels = c;
+        }
+
+        cam_info.insert(std::pair<uint, Camera>(i, Camera(name, topic_name, w, h, c)));
+    }
+
+    out_img = Image(max_width, max_height, max_channels);
+
+    return true;
+}
+
+bool App::initialize(int argc, char *argv[])
+{
+    // This must run first so that camera settings are initialized
+    if (!parseCameraFile()) {
+        return false;
+    } 
+
+    if (!initializeSocket()) {
+        return false;
+    }
+    initializeROS(argc, argv);
+    if (!initializeGlfw()) {
+        return false;
+    }
+    initializeImGui();
+
+    return true;
+}
+
+bool App::initializeSocket()
+{
+    if ((sock.sock = socket(AF_INET, SOCK_DGRAM, 0)) == 0) {
+        printText("Could not initialize socket.");
+        return false;
+    }
+
+    memset(&sock.addr, 0, sizeof(sock.addr));
+    sock.addr.sin_family = AF_INET; 
+    sock.addr.sin_addr.s_addr = INADDR_ANY;
+    sock.addr.sin_port = htons(sock.PORT);
+
+    if (bind(sock.sock, (const sockaddr *)&sock.addr, sizeof(sock.addr)) < 0) { 
+        printText("Socket binding failed."); 
+        return false;
+    }
+
+    return true;
+}
+
+void App::initializeROS(int argc, char *argv[])
+{
+    ros::init(argc, argv, "ros_openvr");
+    ros::NodeHandle n;
+
+    ee_pub = n.advertise<relaxed_ik::EEPoseGoals>("/relaxed_ik/ee_pose_goals", 1000);
+    gripper_pub = n.advertise<std_msgs::Bool>("/relaxed_ik/gripper_state", 1000);
+    reset_pub = n.advertise<std_msgs::Bool>("/relaxed_ik/reset_pose", 1000);
+    
+    // cam_pos_sub(n.subscribe<geometry_msgs::Pose>("/cam/pose_actual", 10, cameraCallback);
+    for (int i = 0; i < cam_info.size(); i++) {
+        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(cam_info[i].topic_name, 10, boost::bind(&App::cameraCallback, this, _1, i)));
+        cam_subs.push_back(cam_sub);
+    }
+}
+
+bool App::initializeGlfw()
+{
+    if (!glfwInit()) {
+        printText("Could not initialize GLFW!");
+        return false;
+    }
+    glfwSetErrorCallback(glfw_error_callback);
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    window = glfwCreateWindow(app_params.WINDOW_WIDTH, app_params.WINDOW_HEIGHT, "Camera Feed", NULL, NULL);
+    if (!window) {
+        printText("Could not create window.");
+        return false;
+    }
+    glfwMakeContextCurrent(window);
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        printText("Failed to initialize GLAD");
+        return false;
+    }
+    glViewport(0, 0, app_params.WINDOW_WIDTH, app_params.WINDOW_HEIGHT);
+    // glEnable(GL_DEPTH_TEST);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    return true;
+}
+
+void App::initializeImGui()
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    ImGui::StyleColorsDark();
+
+    ImGuiStyle& style = ImGui::GetStyle();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    }
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+}
+
+void App::shutdown()
+{
+    if (ros::ok()) {
+        ros::shutdown();
+    }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+    glfwDestroyWindow(window);
+    glfwTerminate();
+}
+
+
+// -- Robot control --
 glm::vec3 positionToRobotFrame(glm::vec3 v)
 {
     return glm::vec3(-v.y, -v.z, v.x);
 }
 
-glm::quat orientationToRobotFrame(ControllerInput input)
+glm::quat orientationToRobotFrame(glm::quat quat_in)
 {
-    glm::quat in = input.orientation;
-
-    glm::vec3 new_euler = glm::vec3(glm::pitch(in), -glm::roll(in), -glm::yaw(in));
+    glm::vec3 new_euler = glm::vec3(glm::pitch(quat_in), -glm::roll(quat_in), -glm::yaw(quat_in));
     glm::quat new_quat = glm::quat(new_euler);
 
     return new_quat;
@@ -112,8 +355,20 @@ glm::vec3 translation_from_matrix(glm::mat4 mat)
     return glm::vec3(mat[0][3], mat[1][3], mat[2][3]);
 }
 
-void parseInput(std::string data, ControllerInput& input)
+std::string getData(Socket &sock)
 {
+    int len_data;
+    len_data = recvfrom(sock.sock, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.addr), &(sock.len)); 
+    sock.buffer[len_data] = '\0';
+    std::string data = sock.buffer;
+
+    return data;
+}
+
+void App::parseControllerInput(std::string data)
+{
+    std::string CONTR_NAME = app_params.CONTR_NAME;
+
     json j = json::parse(data);
 
     auto pos = j[CONTR_NAME]["pose"]["position"];
@@ -125,7 +380,7 @@ void parseInput(std::string data, ControllerInput& input)
     input.gripping = j[CONTR_NAME]["gripper"]["boolean"];
     input.clutching = j[CONTR_NAME]["clutch"]["boolean"];
 
-    input.camera_mode = j[CONTR_NAME]["manual_adj"]["boolean"];
+    input.manual_adj = j[CONTR_NAME]["manual_adj"]["boolean"];
     input.manual_offset.z = j[CONTR_NAME]["manual_adj"]["2d"]["x"];
     input.manual_offset.x = j[CONTR_NAME]["manual_adj"]["2d"]["y"];
 
@@ -172,169 +427,128 @@ void parseInput(std::string data, ControllerInput& input)
 
         input.position = positionToRobotFrame(input.position);
         input.manual_offset = positionToRobotFrame(input.manual_offset);
-        input.orientation = orientationToRobotFrame(input);
+        input.orientation = orientationToRobotFrame(input.orientation);
     }
 
-    if (input.change_cam.is_flipping()) {
-        if (active_cam == input.DYNAMIC) {
-            active_cam = input.STATIC;
-        }
-        else {
-            active_cam = input.DYNAMIC;
-        }
+    if (input.change_cam.confirm_flip()) {
+        nextCamera(active_camera, pip_camera, cam_info.size());
     }
 }
 
-std::string getData(int sock, char *buffer, sockaddr_in &addr, socklen_t len)
+void App::publishRobotData()
 {
-    int len_data;
+    EEPoseGoals goal;
+    Pose pose;
+    pose.position.x = input.position.x;
+    pose.position.y = input.position.y;
+    pose.position.z = input.position.z;
 
-    len_data = recvfrom(sock, buffer, MAXLINE, MSG_WAITALL, (sockaddr *) &addr, &len); 
-    buffer[len_data] = '\0';
-    std::string data = buffer;
+    pose.orientation.x = input.orientation.x;
+    pose.orientation.y = input.orientation.y;
+    pose.orientation.z = input.orientation.z;
+    pose.orientation.w = input.orientation.w;
 
-    return data;
+    Pose pose_cam;
+    pose_cam.position.x = input.manual_offset.x;
+    pose_cam.position.y = input.manual_offset.y;
+    pose_cam.position.z = input.manual_offset.z;
+
+    pose_cam.orientation.x = 0.0;
+    pose_cam.orientation.y = 0.0;
+    pose_cam.orientation.z = 0.0;
+    pose_cam.orientation.w = 1.0;
+
+    goal.header.stamp = ros::Time::now();
+    goal.ee_poses.push_back(pose);
+    goal.ee_poses.push_back(pose_cam);
+
+    ee_pub.publish(goal);
+
+    input.prev_pos = glm::vec3(input.position.x, input.position.y, input.position.z);
+
+
+    Bool gripping;
+    gripping.data = input.gripping.is_on();
+
+    gripper_pub.publish(gripping);        
 }
 
-void cameraCallback(const geometry_msgs::Pose::ConstPtr& msg, ControllerInput& input)
+
+// -- Window handling --
+void glfw_error_callback(int code, const char* description)
 {
-    auto pos = msg->position;
-    auto quat = msg->orientation;
-    input.cam_pos = glm::vec3(pos.x, pos.y, pos.z);
-    input.cam_orient = glm::quat(quat.w, quat.x, quat.y, quat.z);
+    printText("GLFW Error: " + code);
+    printText(description);
 }
-
-void dynamicImageCb(const sensor_msgs::ImageConstPtr& msg, ControllerInput& input)
-{
-    if (!input.dyn_valid) {
-        input.dyn_valid = true;
-    }
-    
-    if (active_cam != input.DYNAMIC) {
-        return;
-    }
-
-    cv_bridge::CvImageConstPtr cur_img;
-    try
-    {
-        cur_img = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::RGB8);
-    }
-    catch (cv_bridge::Exception& e)
-    {
-        printText("cv_bridge exception: %s", 0);
-        printText(e.what());
-        input.dyn_valid = false;
-        return;
-    }
-
-    cv::Mat image = cur_img->image;
-    int data_size = image.cols * image.rows * image.channels();
-    if (data_size > tex_size) {
-        delete[] tex_buffer;
-        tex_size = data_size;
-        tex_buffer = new GLubyte[tex_size];
-    }
-    memcpy(tex_buffer, cur_img->image.data, data_size);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.cols, image.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)tex_buffer);         
-}
-
-void staticImageCb(const sensor_msgs::ImageConstPtr& msg, ControllerInput& input)
-{
-    if (!input.stat_valid) {
-        input.stat_valid = true;
-    }
-    
-    if (active_cam != input.STATIC) {
-        return;
-    }
-
-    cv_bridge::CvImageConstPtr cur_img;
-    try
-    {
-        cur_img = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::RGB8);
-    }
-    catch (cv_bridge::Exception& e)
-    {
-        printText("cv_bridge exception: %s", 0);
-        printText(e.what());
-        input.stat_valid = false;
-        return;
-    }
-
-    cv::Mat image = cur_img->image;
-    int data_size = image.cols * image.rows * image.channels();
-    if (data_size > tex_size) {
-        delete[] tex_buffer;
-        tex_size = data_size;
-        tex_buffer = new GLubyte[tex_size];
-    }
-    memcpy(tex_buffer, cur_img->image.data, data_size);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.cols, image.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)tex_buffer);
-}
-
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
 }
 
-void processInput(GLFWwindow *window, ControllerInput input)
+void App::processInput()
 {
-    if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, true);
     }
 
-    if (glfwGetKey(window,GLFW_KEY_1) == GLFW_PRESS) {
-        active_cam = input.DYNAMIC;
-    }
-    else if (glfwGetKey(window,GLFW_KEY_2) == GLFW_PRESS) {
-        active_cam = input.STATIC;
-    }
-    
-}
-
-bool showCameraSelector(ControllerInput input)
-{
-    static int cam_idx = 1;
-    const char* label = "Camera";
-
-    if (active_cam == input.DYNAMIC) {
-        cam_idx = 0;
-    }
-    else {
-        cam_idx = 1;
+    switch_cam = glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS;
+    if (switch_cam.confirm_flip()) {
+        nextCamera(active_camera, pip_camera, cam_info.size());
     }
 
-    if (ImGui::Combo(label, &cam_idx, "Dynamic\0Static\0"))
-    {
-        switch (cam_idx)
-        {
-            case 0: 
-            {
-                active_cam = input.DYNAMIC;
-            }   break;
-            case 1:
-            {
-                active_cam = input.STATIC;
-            }   break;
-        }
-
-        return true;
-    }
-
-    return false;
+    clutch_mode = glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS;
 }
 
 
-int main(int argc, char *argv[])
+// -- OpenGL and Dear ImGui --
+void Image::createTexture(uint tex_num)
 {
-    ros::init(argc, argv, "ros_openvr");
-    ros::NodeHandle n;
-    ControllerInput input;
+    glGenTextures(1, &id);
+    glActiveTexture(GL_TEXTURE0 + tex_num);
+    glBindTexture(GL_TEXTURE_2D, id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+}
 
-    // Change cwd so we can specify resources more easily
-    chdir("../../../src/openvr_ros");
+void App::updateOutputImage()
+{
+    Camera cur_cam = cam_info.at(active_camera);
+    uint cam_size = cur_cam.image.size;
 
+    if (cam_size != out_img.size) {
+        // TODO: Figure out how to deal with different sizes
+    }
+
+    out_img.data.assign(cur_cam.image.data.data(), cur_cam.image.data.data() + cur_cam.image.data.size());
+    glActiveTexture(0);
+    glBindTexture(GL_TEXTURE_2D, out_img.id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, out_img.width, out_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)out_img.data.data());
+}
+
+void App::updatePipImage()
+{
+    Camera cur_cam = cam_info.at(pip_camera);
+    uint cam_size = cur_cam.image.size;
+
+    if (cam_size != out_img.size) {
+        // TODO: Figure out how to deal with different sizes
+    }
+
+    cv::Mat flip_mat = cv::Mat(cur_cam.image.width, cur_cam.image.height, CV_8UC3, cur_cam.image.data.data());
+    cv::flip(flip_mat, flip_mat, 0);
+
+    pip_img.resize(cur_cam.image.width, cur_cam.image.height, cur_cam.image.channels);
+    pip_img.copy_data(flip_mat);
+    glActiveTexture(2);
+    glBindTexture(GL_TEXTURE_2D, pip_img.id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, pip_img.width, pip_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)pip_img.data.data());
+}
+
+Mesh generateSquare()
+{
     float vertices[] = {
         // positions          // colors           // texture coords
          1.0f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
@@ -347,212 +561,224 @@ int main(int argc, char *argv[])
         1, 2, 3  // second triangle
     };
 
-    // TEST
-    ros::Publisher marker_pub(n.advertise<visualization_msgs::Marker>("visualization_marker", 1000));
-    ros::Publisher ee_pub(n.advertise<relaxed_ik::EEPoseGoals>("/relaxed_ik/ee_pose_goals", 1000));
-    ros::Publisher gripper_pub(n.advertise<std_msgs::Bool>("/relaxed_ik/gripper_state", 1000));
-    ros::Publisher reset_pub(n.advertise<std_msgs::Bool>("/relaxed_ik/reset_pose", 1000));
+    Mesh mesh;
 
-    ros::Subscriber cam_sub(n.subscribe<geometry_msgs::Pose>("/cam/pose_actual", 10, boost::bind(cameraCallback, _1, std::ref(input))));
-    ros::Subscriber dyn_sub(n.subscribe<sensor_msgs::Image>("/cam/dyn_image", 10, boost::bind(dynamicImageCb, _1, std::ref(input))));
-    ros::Subscriber stat_sub(n.subscribe<sensor_msgs::Image>("/cam/stat_image", 10, boost::bind(staticImageCb, _1, std::ref(input))));
+    glGenVertexArrays(1, &mesh.VAO);
+    glGenBuffers(1, &mesh.VBO);
+    glGenBuffers(1, &mesh.EBO);
 
-    if (!glfwInit()) {
-        printText("Could not initialize GLFW!");
-        return -1;
-    }
-    glfwSetErrorCallback(glfw_error_callback);
+    // Binds
+    glBindVertexArray(mesh.VAO);
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    GLFWwindow* window = glfwCreateWindow(WIN_WIDTH, WIN_HEIGHT, "OpenVR ROS", NULL, NULL);
-    if (!window) {
-        printText("Could not create window.");
-        return -1;
-    }
-    glfwMakeContextCurrent(window);
-
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        printText("Failed to initialize GLAD");
-        return -1;
-    }
-    glViewport(0, 0, WIN_WIDTH, WIN_HEIGHT);
-    // glEnable(GL_DEPTH_TEST);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    ImGui::StyleColorsDark();
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");
-
-    // Init data feed socket
-    // TODO: Consider putting these into a struct
-    // int sock;
-    // sockaddr_in addr;
-    // socklen_t len;
-    // char buffer[MAXLINE];
-    // {
-    //     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == 0) {
-    //         printText("Could not initialize socket.");
-    //         return 1;
-    //     }
-
-    //     memset(&addr, 0, sizeof(addr));
-    //     addr.sin_family = AF_INET; 
-    //     addr.sin_addr.s_addr = INADDR_ANY;
-    //     addr.sin_port = htons(PORT);
-
-    //     // TODO: Allow exiting while this blocks
-    //     if (bind(sock, (const sockaddr *)&addr, sizeof(addr)) < 0) { 
-    //         printText("Binding failed"); 
-    //         return 1;
-    //     }
-    // }
-
-
-    // Get initial values
-    // std::string data;
-    // data = getData(sock, buffer, addr, len);
-    // parseInput(data, input);
-
-    unsigned int VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh.VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-    // position attribute
+    // Position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    // color attribute
+    // Color attribute
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
-    // texture coord attribute
+    // Texture coord attribute
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
     glEnableVertexAttribArray(2);
+    
+    return mesh;
+}
 
-    uint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture); 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    
+void App::buildMenu(const char* title, void (App::*build_func)(void), ImGuiWindowFlags window_flags)
+{
+
+    ImGui::Begin(title, (bool *)NULL, window_flags);
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.6f);
+    (this->*build_func)();
+    ImGui::PopItemWidth();
+    ImGui::End();
+}
+
+void App::buildCameraSelectors()
+{
+    const char *cam_preview = cam_info.at(active_camera).name.c_str(); 
+    if (ImGui::BeginCombo("Camera", cam_preview, ImGuiComboFlags_None))
+    {
+        for (int n = 0; n < cam_info.size(); n++)
+        {
+            const char *cam_name = cam_info.at(n).name.c_str();
+            const bool is_selected = (active_camera == n);
+            if (ImGui::Selectable(cam_name, is_selected)) {
+                active_camera = n;
+            }
+
+            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+            if (is_selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+
+        ImGui::EndCombo();
+    }
+
+    mismatchCameras(active_camera, pip_camera, cam_info.size());
+
+    if (cam_info.size() > 1) {
+        ImGui::Checkbox("PiP Enabled", &pip_enabled);
+        if (pip_enabled) {
+            const char *pip_preview = pip_preview = cam_info.at(pip_camera).name.c_str(); 
+            if (ImGui::BeginCombo("PiP Camera", pip_preview, ImGuiComboFlags_None))
+            {
+                for (int n = 0; n < cam_info.size(); n++)
+                {
+                    // Skip currently active main camera
+                    if (active_camera == n) {
+                        continue;
+                    }
+
+                    const char *cam_name = cam_info.at(n).name.c_str();
+                    const bool is_selected = (pip_camera == n);
+                    if (ImGui::Selectable(cam_name, is_selected)) {
+                        pip_camera = n;
+                    }
+
+                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                    if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+
+                ImGui::EndCombo();
+            }
+        }
+    }
+}
+
+void App::buildPiPWindow()
+{
+    ImTextureID img_id = (ImTextureID)(pip_img.id);
+    ImGui::Image(img_id, ImVec2(app_params.pip_width, app_params.pip_height));
+}
+
+
+// -- ROS Callbacks --
+void App::cameraCallback(const sensor_msgs::ImageConstPtr& msg, int index)
+{
+    cv_bridge::CvImageConstPtr cur_img;
+    try
+    {
+        cur_img = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::RGB8);
+    }
+    catch (cv_bridge::Exception& e)
+    {
+        printText("cv_bridge exception: %s", 0);
+        printText(e.what());
+        return;
+    }
+
+    cv::Mat image = cur_img->image;
+    int data_size = image.cols * image.rows * image.channels();
+    if (data_size > cam_info.at(index).image.size) {
+        cam_info.at(index).image.resize(image.cols, image.rows, image.channels());
+    }
+    cam_info.at(index).image.copy_data(image);
+}
+
+
+int App::run(int argc, char *argv[])
+{
+    // Change working directory so we can specify resources more easily
+    // Note that this depends on the 'cwd' param of the launch file being set to "node"
+    chdir("../../../src/multicam_mimicry");
+
+    if (!initialize(argc, argv)) {
+        return -1;
+    }
+
+    Mesh img_surface = generateSquare();
+    out_img.createTexture(0);
+
+    cv::Mat overlay_img = cv::imread("resources/textures/multicam_overlay.png");
+    if (overlay_img.empty()) {
+        printText("Could not load overlay image.");
+        return -1;
+    }
+    cv::flip(overlay_img, overlay_img, 0);
+    Image overlay = Image(overlay_img.cols, overlay_img.rows, overlay_img.channels());
+    overlay.copy_data(overlay_img);
+    overlay.createTexture(1);
+
+    pip_img = Image();
+    pip_img.createTexture(2);
+
+
     Shader bg_shader("resources/shaders/bg_shader.vert", "resources/shaders/bg_shader.frag");
     bg_shader.use();
     bg_shader.setInt("Texture", 0);
+    bg_shader.setInt("Overlay", 1);
 
-    tex_buffer = new GLubyte[tex_size];
-    memset(tex_buffer, 0, tex_size);
-
-    ros::Rate loop_rate(LOOPRATE);
+    ros::Rate loop_rate(app_params.loop_rate);
     while (ros::ok() && !glfwWindowShouldClose(window))
     {
-        // Window rendering
-        processInput(window, input);
-
-        // if (input.dyn_valid && input.stat_valid) {   
-        //     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, input.texture.width, input.texture.height, 0, GL_BGR, GL_UNSIGNED_BYTE, (GLvoid*)input.texture.data);         
-        //     // glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, input.texture.width, input.texture.height, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)input.texture.data);
-        //     printText("Error: " + std::to_string(glGetError()));
-        //     // glGenerateMipmap(GL_TEXTURE_2D);
-        // }
-
+        glfwPollEvents();
+        processInput();
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         // ImGui::ShowDemoWindow();
+        
+        ImGuiWindowFlags win_flags = 0;
+        win_flags |= ImGuiWindowFlags_NoScrollbar;
+        win_flags |= ImGuiWindowFlags_NoResize;
+        buildMenu("Camera Feed", &App::buildCameraSelectors, win_flags);
 
-        // Camera switching window
-        ImGui::Begin("Camera Feed");
-        ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.6f);
-        showCameraSelector(input);
-        ImGui::PopItemWidth();
-        ImGui::End();
+        if (pip_enabled) { 
+            win_flags |= ImGuiWindowFlags_NoTitleBar;
+            ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
 
+            buildMenu("PiP Feed", &App::buildPiPWindow, win_flags);
+        }
+
+        updateOutputImage();
+        glActiveTexture(1);
+        glBindTexture(GL_TEXTURE_2D, overlay.id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, overlay.width, overlay.height, 0, GL_BGR, GL_UNSIGNED_BYTE, (GLvoid*)overlay.data.data());
+
+        if (pip_enabled) {
+            updatePipImage();
+        }
+
+        bg_shader.setBool("overlay_on", clutch_mode.is_on());
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glBindVertexArray(VAO);
+        glBindVertexArray(img_surface.VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        
+
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            GLFWwindow* backup_current_context = glfwGetCurrentContext();
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            glfwMakeContextCurrent(backup_current_context);
+        }
+
         glfwSwapBuffers(window);
-        glfwPollEvents();
 
+        // ImGui::EndFrame();
 
-        // data = getData(sock, buffer, addr, len);
-        // parseInput(data, input);
-
-        // printText(input.to_str(true));
-
-        EEPoseGoals goal;
-        Pose pose;
-        pose.position.x = input.position.x;
-        pose.position.y = input.position.y;
-        pose.position.z = input.position.z;
-
-        pose.orientation.x = input.orientation.x;
-        pose.orientation.y = input.orientation.y;
-        pose.orientation.z = input.orientation.z;
-        pose.orientation.w = input.orientation.w;
-
-        Pose pose_cam;
-        pose_cam.position.x = input.manual_offset.x;
-        pose_cam.position.y = input.manual_offset.y;
-        pose_cam.position.z = input.manual_offset.z;
-
-        pose_cam.orientation.x = 0.0;
-        pose_cam.orientation.y = 0.0;
-        pose_cam.orientation.z = 0.0;
-        pose_cam.orientation.w = 1.0;
-
-        goal.header.stamp = ros::Time::now();
-        goal.ee_poses.push_back(pose);
-        goal.ee_poses.push_back(pose_cam);
-
-        ee_pub.publish(goal);
-
-        input.prev_pos = glm::vec3(input.position.x, input.position.y, input.position.z);
-
-
-        Bool gripping;
-        gripping.data = input.gripping.is_on();
-
-        gripper_pub.publish(gripping);        
+        publishRobotData();
 
         ros::spinOnce();
         loop_rate.sleep();
     }
-    if (ros::ok()) {
-        ros::shutdown();
-    }
-
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    shutdown();
 
     return 0;
 }

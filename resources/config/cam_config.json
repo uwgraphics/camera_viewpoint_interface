@@ -1,0 +1,17 @@
+{
+    "_num_cams": 2,
+    "cam0": {
+        "name": "dynamic",
+        "topic": "/cam/dyn_image",
+        "width": 1024,
+        "height": 1024,
+        "channels": 3
+    },
+    "cam1": {
+        "name": "static",
+        "topic": "/cam/stat_image",
+        "width": 1024,
+        "height": 1024,
+        "channels": 3
+    }
+}
