@@ -134,6 +134,12 @@ namespace multicam
 
             return false;
         }
+        bool confirm_flip_on() {
+            return confirm_flip() && is_on();
+        }
+        bool confirm_flip_off() {
+            return confirm_flip() && !is_on();    
+        }
 
         // TODO: Consider breaking this out into button object
         bool button_pressed() { return m_cur_signal && !m_prev_signal; }
@@ -150,7 +156,7 @@ namespace multicam
                 {
                     m_state = m_cur_signal;
                     if (button_pressed() || button_depressed()) {
-                        m_flipping = true;
+                        flip();
                     }
                 } break;
                 case Type::SINGLE:
@@ -195,7 +201,6 @@ namespace multicam
         Switch manual_adj;
         Switch reset;
         Switch clutching;
-        Switch change_cam;
         glm::vec3 clutch_offset;
         cv_bridge::CvImagePtr cur_img;
         bool dyn_valid, stat_valid;
@@ -208,10 +213,9 @@ namespace multicam
             init_orient, orientation, cam_orient = glm::quat();
             initialized = false;
             gripping = Switch(); // Gripper starts open
-            manual_adj = Switch(false, Switch::Type::SINGLE);
+            manual_adj = Switch(false, Switch::Type::HOLD);
             reset = Switch();
             clutching = Switch(false, Switch::Type::SINGLE);
-            change_cam = Switch(false, Switch::Type::SINGLE);
             clutch_offset = glm::vec3();
             dyn_valid, stat_valid = false;
         }
@@ -236,9 +240,8 @@ namespace multicam
     public:
         App(AppParams params = AppParams()) : app_params(params)
         {
-            pip_enabled = false;
+            pip_enabled = clutch_mode = false;
             switch_cam = Switch(false, Switch::Type::SINGLE);
-            clutch_mode = Switch(false, Switch::Type::SINGLE);
             active_camera = pip_camera = 0;
 
             // TODO: Add config for cams
@@ -257,7 +260,7 @@ namespace multicam
         uint pip_tex;
         uint pip_camera;
         Switch switch_cam;
-        Switch clutch_mode;
+        bool clutch_mode;
 
         // ROS
         ros::Publisher ee_pub;
@@ -274,6 +277,7 @@ namespace multicam
         Image pip_img;
 
 
+        // General program flow
         bool initialize(int argc, char *argv[]);
         bool parseCameraFile();
         bool initializeSocket();
@@ -282,11 +286,13 @@ namespace multicam
         void initializeImGui();
         void shutdown();
 
+        // Robot control
         void parseControllerInput(std::string data);
         void publishRobotData();
+        void handleRobotControl();
 
         void cameraCallback(const sensor_msgs::ImageConstPtr& msg, int index);
-        void processInput();
+        void processWindowInput();
         void updateOutputImage();
         void updatePipImage();
         
@@ -301,6 +307,7 @@ namespace multicam
 void printText(std::string text="", int newlines=1, bool flush=false);
 void mismatchCameras(uint &cam1, uint &cam2, uint size);
 void nextCamera(uint &active, uint &pip, uint size);
+void previousCamera(uint &active, uint &pip, uint size);
 
 void glfw_error_callback(int code, const char* description);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);

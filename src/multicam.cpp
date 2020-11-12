@@ -155,6 +155,12 @@ void nextCamera(uint &active, uint &pip, uint size)
     mismatchCameras(active, pip, size);
 }
 
+void previousCamera(uint &active, uint &pip, uint size)
+{
+    active = (active == 0) ? size-1 : active-1;
+    mismatchCameras(active, pip, size);
+}
+
 bool App::parseCameraFile()
 {
     std::ifstream cam_file;
@@ -355,8 +361,9 @@ glm::vec3 translation_from_matrix(glm::mat4 mat)
     return glm::vec3(mat[0][3], mat[1][3], mat[2][3]);
 }
 
-std::string getData(Socket &sock)
+std::string getSocketData(Socket &sock)
 {
+    // TODO: Make this async
     int len_data;
     len_data = recvfrom(sock.sock, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.addr), &(sock.len)); 
     sock.buffer[len_data] = '\0';
@@ -381,11 +388,10 @@ void App::parseControllerInput(std::string data)
     input.clutching = j[CONTR_NAME]["clutch"]["boolean"];
 
     input.manual_adj = j[CONTR_NAME]["manual_adj"]["boolean"];
-    input.manual_offset.z = j[CONTR_NAME]["manual_adj"]["2d"]["x"];
-    input.manual_offset.x = j[CONTR_NAME]["manual_adj"]["2d"]["y"];
+    input.manual_offset.x = j[CONTR_NAME]["manual_adj"]["2d"]["x"];
+    input.manual_offset.z = j[CONTR_NAME]["manual_adj"]["2d"]["y"];
 
     input.reset = j[CONTR_NAME]["reset"]["boolean"];
-    // input.switch_cam = j[CONTR_NAME]["switch_cam"]["boolean"];
 
     if (!input.initialized) {
         input.init_pos = pos_vec;
@@ -407,6 +413,18 @@ void App::parseControllerInput(std::string data)
         }
     }
 
+    if (input.manual_adj.confirm_flip_on()) {
+        if (input.manual_offset.x >= 0.5) {
+            nextCamera(active_camera, pip_camera, cam_info.size());
+        }
+        else if (input.manual_offset.x <= -0.5) {
+            previousCamera(active_camera, pip_camera, cam_info.size());
+        }
+        else {
+            pip_enabled = !pip_enabled;
+        }
+    }
+
     // TODO: Consider how this should interact with clutching
     if (!input.reset.is_on() && input.reset.is_flipping()) {
         input.init_pos = pos_vec;
@@ -418,6 +436,7 @@ void App::parseControllerInput(std::string data)
 
     // TODO: **Add mode for using camera frame**
     if (!input.clutching.is_on() && !input.reset.is_on()) {
+        clutch_mode = false;
 
         input.position = pos_vec - input.init_pos;
         input.position = glm::rotate(input.init_orient, input.position);
@@ -426,12 +445,13 @@ void App::parseControllerInput(std::string data)
         input.orientation = input.inv_init_quat * quat_vec; // Displacement b/w quats
 
         input.position = positionToRobotFrame(input.position);
-        input.manual_offset = positionToRobotFrame(input.manual_offset);
+        // input.manual_offset = positionToRobotFrame(input.manual_offset);
         input.orientation = orientationToRobotFrame(input.orientation);
     }
-
-    if (input.change_cam.confirm_flip()) {
-        nextCamera(active_camera, pip_camera, cam_info.size());
+    else {
+        // Clutching mode handling
+        // Note that the behavior of buttons changes while in this mode
+        clutch_mode = true;
     }
 }
 
@@ -473,6 +493,11 @@ void App::publishRobotData()
     gripper_pub.publish(gripping);        
 }
 
+void App::handleRobotControl()
+{
+    // TODO: Break this out into its own thread
+}
+
 
 // -- Window handling --
 void glfw_error_callback(int code, const char* description)
@@ -486,7 +511,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     glViewport(0, 0, width, height);
 }
 
-void App::processInput()
+void App::processWindowInput()
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, true);
@@ -497,7 +522,9 @@ void App::processInput()
         nextCamera(active_camera, pip_camera, cam_info.size());
     }
 
-    clutch_mode = glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS;
+    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+        clutch_mode = !clutch_mode;
+    }
 }
 
 
@@ -695,6 +722,7 @@ int App::run(int argc, char *argv[])
         return -1;
     }
 
+    // Set up camera textures
     Mesh img_surface = generateSquare();
     out_img.createTexture(0);
 
@@ -707,6 +735,7 @@ int App::run(int argc, char *argv[])
     Image overlay = Image(overlay_img.cols, overlay_img.rows, overlay_img.channels());
     overlay.copy_data(overlay_img);
     overlay.createTexture(1);
+    overlay_img.release();
 
     pip_img = Image();
     pip_img.createTexture(2);
@@ -717,11 +746,18 @@ int App::run(int argc, char *argv[])
     bg_shader.setInt("Texture", 0);
     bg_shader.setInt("Overlay", 1);
 
+
+    // Get initial values
+    std::string input_data;
+    input_data = getSocketData(sock);
+    parseControllerInput(input_data);
+
+
     ros::Rate loop_rate(app_params.loop_rate);
     while (ros::ok() && !glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-        processInput();
+        processWindowInput();
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -750,7 +786,7 @@ int App::run(int argc, char *argv[])
             updatePipImage();
         }
 
-        bg_shader.setBool("overlay_on", clutch_mode.is_on());
+        bg_shader.setBool("overlay_on", clutch_mode);
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -772,6 +808,10 @@ int App::run(int argc, char *argv[])
         glfwSwapBuffers(window);
 
         // ImGui::EndFrame();
+
+        input_data = getSocketData(sock);
+        parseControllerInput(input_data);
+        printText(input.to_str(true));
 
         publishRobotData();
 
