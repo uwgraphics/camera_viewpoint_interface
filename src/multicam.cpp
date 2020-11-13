@@ -1,27 +1,29 @@
+// Standard libraries
 #include <iostream>
 #include <thread>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+// ROS
 #include <geometry_msgs/Pose.h>
 #include <sensor_msgs/Joy.h>
 #include <sensor_msgs/Image.h>
 #include <std_msgs/Bool.h>
 #include <relaxed_ik/EEPoseGoals.h>
-#include <opencv2/opencv.hpp>
-#include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 
-// TEST
-#include <visualization_msgs/Marker.h>
+// OpenCV
+#include <opencv2/opencv.hpp>
+#include <cv_bridge/cv_bridge.h>
 
+// OpenGL and Dear ImGui
 #include <glad/glad.h> 
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
-
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+// Custom headers
 #include "multicam_mimicry/json.hpp"
 #include "multicam_mimicry/multicam.hpp"
 #include "multicam_mimicry/shader.hpp"
@@ -37,16 +39,6 @@ using Image = multicam::Image;
 using Socket = multicam::Socket;
 
 
-// void cameraCallback(const geometry_msgs::Pose::ConstPtr& msg, ControllerInput& input)
-// {
-//     auto pos = msg->position;
-//     auto quat = msg->orientation;
-//     input.cam_pos = glm::vec3(pos.x, pos.y, pos.z);
-//     input.cam_orient = glm::quat(quat.w, quat.x, quat.y, quat.z);
-// }
-
-
-
 /**
  * Entry point to the application.
  */
@@ -55,61 +47,6 @@ int main(int argc, char *argv[])
     App app = App();
     app.run(argc, argv);
     return 0;
-
-
-
-    // Get initial values
-    // std::string data;
-    // data = getData(sock, buffer, addr, len);
-    // parseInput(data, input);
-
-    
-    // while (ros::ok() && !glfwWindowShouldClose(window))
-    {
-
-
-        // data = getData(sock, buffer, addr, len);
-        // parseInput(data, input);
-
-        // printText(input.to_str(true));
-
-        // EEPoseGoals goal;
-        // Pose pose;
-        // pose.position.x = input.position.x;
-        // pose.position.y = input.position.y;
-        // pose.position.z = input.position.z;
-
-        // pose.orientation.x = input.orientation.x;
-        // pose.orientation.y = input.orientation.y;
-        // pose.orientation.z = input.orientation.z;
-        // pose.orientation.w = input.orientation.w;
-
-        // Pose pose_cam;
-        // pose_cam.position.x = input.manual_offset.x;
-        // pose_cam.position.y = input.manual_offset.y;
-        // pose_cam.position.z = input.manual_offset.z;
-
-        // pose_cam.orientation.x = 0.0;
-        // pose_cam.orientation.y = 0.0;
-        // pose_cam.orientation.z = 0.0;
-        // pose_cam.orientation.w = 1.0;
-
-        // goal.header.stamp = ros::Time::now();
-        // goal.ee_poses.push_back(pose);
-        // goal.ee_poses.push_back(pose_cam);
-
-        // ee_pub.publish(goal);
-
-        // input.prev_pos = glm::vec3(input.position.x, input.position.y, input.position.z);
-
-
-        // Bool gripping;
-        // gripping.data = input.gripping.is_on();
-
-        // gripper_pub.publish(gripping);        
-
-    }
-
 }
 
 // -- Helper functions --
@@ -364,7 +301,6 @@ glm::vec3 translation_from_matrix(glm::mat4 mat)
 
 std::string getSocketData(Socket &sock)
 {
-    // TODO: Make this async
     int len_data;
     len_data = recvfrom(sock.sock, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.addr), &(sock.len)); 
     sock.buffer[len_data] = '\0';
@@ -702,6 +638,14 @@ void App::buildPiPWindow()
 
 
 // -- ROS Callbacks --
+// void cameraPoseCallback(const geometry_msgs::Pose::ConstPtr& msg, ControllerInput& input)
+// {
+//     auto pos = msg->position;
+//     auto quat = msg->orientation;
+//     input.cam_pos = glm::vec3(pos.x, pos.y, pos.z);
+//     input.cam_orient = glm::quat(quat.w, quat.x, quat.y, quat.z);
+// }
+
 void App::cameraCallback(const sensor_msgs::ImageConstPtr& msg, int index)
 {
     cv_bridge::CvImageConstPtr cur_img;
