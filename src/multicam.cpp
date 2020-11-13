@@ -201,7 +201,7 @@ void App::initializeROS(int argc, char *argv[])
     
     // cam_pos_sub(n.subscribe<geometry_msgs::Pose>("/cam/pose_actual", 10, cameraCallback);
     for (int i = 0; i < cam_info.size(); i++) {
-        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(cam_info[i].topic_name, 10, boost::bind(&App::cameraCallback, this, _1, i)));
+        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(cam_info[i].topic_name, 10, boost::bind(&App::cameraImageCallback, this, _1, i)));
         cam_subs.push_back(cam_sub);
     }
 }
@@ -212,7 +212,7 @@ bool App::initializeGlfw()
         printText("Could not initialize GLFW!");
         return false;
     }
-    glfwSetErrorCallback(glfw_error_callback);
+    glfwSetErrorCallback(glfwErrorCallback);
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -231,7 +231,10 @@ bool App::initializeGlfw()
     }
     glViewport(0, 0, app_params.WINDOW_WIDTH, app_params.WINDOW_HEIGHT);
     // glEnable(GL_DEPTH_TEST);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+    
+    glfwSetWindowUserPointer(window, this);
+    glfwSetKeyCallback(window, keyCallbackForwarding);
 
     return true;
 }
@@ -340,12 +343,19 @@ void App::parseControllerInput(std::string data)
         input.initialized = true;
     }
 
+    // Handle clutching enabled by keyboard
+    if (clutch_mode && !input.clutching.is_flipping() && !input.clutching.is_on()) {
+        input.clutching.turn_on();
+    }
+
     if (input.clutching.is_flipping()) {
         if (input.clutching.is_on()) { // When just turned on
+            clutch_mode = true;
             input.clutch_offset = pos_vec - input.init_pos;
             // TODO: Add orientation handling
         }
         else {
+            clutch_mode = false;
             input.init_pos = pos_vec - input.clutch_offset;
         }
     }
@@ -373,8 +383,6 @@ void App::parseControllerInput(std::string data)
 
     // TODO: **Add mode for using camera frame**
     if (!input.clutching.is_on() && !input.reset.is_on()) {
-        clutch_mode = false;
-
         input.position = pos_vec - input.init_pos;
         input.position = glm::rotate(input.init_orient, input.position);
         glm::mat4 trans_mat = glm::toMat4(input.cam_orient) * translation_matrix(input.position);
@@ -388,7 +396,6 @@ void App::parseControllerInput(std::string data)
     else {
         // Clutching mode handling
         // Note that the behavior of buttons changes while in this mode
-        clutch_mode = true;
     }
 }
 
@@ -449,30 +456,36 @@ void App::handleRobotControl()
 
 
 // -- Window handling --
-void glfw_error_callback(int code, const char* description)
+void glfwErrorCallback(int code, const char* description)
 {
     printText("GLFW Error: " + code);
     printText(description);
 }
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
 }
 
-void App::processWindowInput()
+void App::keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+    App *app = (App *)glfwGetWindowUserPointer(window);
+    app->keyCallback(window, key, scancode, action, mods);
+}
+
+void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, true);
     }
-
-    switch_cam = glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS;
-    if (switch_cam.confirm_flip()) {
+    else if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
         nextCamera(active_camera, pip_camera, cam_info.size());
     }
-
-    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+    else if (key == GLFW_KEY_C && action == GLFW_PRESS) {
         clutch_mode = !clutch_mode;
+    }
+    else if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+        pip_enabled = !pip_enabled;
     }
 }
 
@@ -646,7 +659,7 @@ void App::buildPiPWindow()
 //     input.cam_orient = glm::quat(quat.w, quat.x, quat.y, quat.z);
 // }
 
-void App::cameraCallback(const sensor_msgs::ImageConstPtr& msg, int index)
+void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
 {
     cv_bridge::CvImageConstPtr cur_img;
     try
@@ -711,7 +724,6 @@ int App::run(int argc, char *argv[])
     while (ros::ok() && !glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-        processWindowInput();
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();

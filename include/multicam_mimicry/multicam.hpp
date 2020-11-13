@@ -44,8 +44,8 @@ namespace multicam
         uint const WINDOW_WIDTH = 1200;
         uint const WINDOW_HEIGHT = 900;
 
-        uint pip_width = WINDOW_WIDTH * 0.2;
-        uint pip_height = WINDOW_HEIGHT * 0.2;
+        uint pip_width = WINDOW_WIDTH * 0.25;
+        uint pip_height = WINDOW_HEIGHT * 0.25;
 
         uint def_cam_height = 1024;
         uint def_cam_width = 1024;
@@ -122,8 +122,8 @@ namespace multicam
         bool is_flipping() { return m_flipping; }
         std::string to_str() { return (m_state ? "on" : "off"); }
 
-        void turn_on() { m_state = true; }
-        void turn_off() { m_state = false; }
+        void turn_on() { m_state = true; m_flipping = true; m_unconfirmed = true; }
+        void turn_off() { m_state = false; m_flipping = true; m_unconfirmed = true; }
         void flip() { m_state = !m_state; m_flipping = true; m_unconfirmed = true; }
         void set_state(bool state) { m_state = state; }
         bool confirm_flip() {
@@ -241,7 +241,6 @@ namespace multicam
         App(AppParams params = AppParams()) : app_params(params)
         {
             pip_enabled = clutch_mode = false;
-            switch_cam = Switch(false, Switch::Type::SINGLE);
             active_camera = pip_camera = 0;
 
             // TODO: Add config for cams
@@ -259,7 +258,6 @@ namespace multicam
         bool pip_enabled; // pip = Picture-in-picture
         uint pip_tex;
         uint pip_camera;
-        Switch switch_cam;
         bool clutch_mode;
 
         // ROS
@@ -291,8 +289,9 @@ namespace multicam
         void publishRobotData();
         void handleRobotControl();
 
-        void cameraCallback(const sensor_msgs::ImageConstPtr& msg, int index);
-        void processWindowInput();
+        void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index);
+        static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);
+        void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
         void updateOutputImage();
         void updatePipImage();
         
@@ -309,8 +308,8 @@ void mismatchCameras(uint &cam1, uint &cam2, uint size);
 void nextCamera(uint &active, uint &pip, uint size);
 void previousCamera(uint &active, uint &pip, uint size);
 
-void glfw_error_callback(int code, const char* description);
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void glfwErrorCallback(int code, const char* description);
+void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 
 glm::vec3 positionToRobotFrame(glm::vec3 v);
 glm::quat orientationToRobotFrame(glm::quat quat_in);
