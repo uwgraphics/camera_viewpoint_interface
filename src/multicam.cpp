@@ -1,4 +1,5 @@
 #include <iostream>
+#include <thread>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -495,7 +496,19 @@ void App::publishRobotData()
 
 void App::handleRobotControl()
 {
-    // TODO: Break this out into its own thread
+    // Get initial values
+    std::string input_data;
+    input_data = getSocketData(sock);
+    parseControllerInput(input_data);
+
+    while (ros::ok() && !glfwWindowShouldClose(window))
+    {
+        input_data = getSocketData(sock);
+        parseControllerInput(input_data);
+        printText(input.to_str(true));
+
+        publishRobotData();
+    }
 }
 
 
@@ -746,11 +759,8 @@ int App::run(int argc, char *argv[])
     bg_shader.setInt("Texture", 0);
     bg_shader.setInt("Overlay", 1);
 
-
-    // Get initial values
-    std::string input_data;
-    input_data = getSocketData(sock);
-    parseControllerInput(input_data);
+    // Split robot control into its own thread to improve performance
+    std::thread robot_control(&App::handleRobotControl, this);
 
 
     ros::Rate loop_rate(app_params.loop_rate);
@@ -809,15 +819,10 @@ int App::run(int argc, char *argv[])
 
         // ImGui::EndFrame();
 
-        input_data = getSocketData(sock);
-        parseControllerInput(input_data);
-        printText(input.to_str(true));
-
-        publishRobotData();
-
         ros::spinOnce();
         loop_rate.sleep();
     }
+    robot_control.join();
     shutdown();
 
     return 0;
