@@ -592,7 +592,7 @@ void App::buildMenu(const char* title, void (App::*build_func)(void), ImGuiWindo
 void App::buildCameraSelectors()
 {
     const char *cam_preview = cam_info.at(active_camera).name.c_str(); 
-    if (ImGui::BeginCombo("Camera", cam_preview, ImGuiComboFlags_None))
+    if (ImGui::BeginCombo("Main Camera", cam_preview, ImGuiComboFlags_None))
     {
         for (int n = 0; n < cam_info.size(); n++)
         {
@@ -737,7 +737,10 @@ int App::run(int argc, char *argv[])
         win_flags |= ImGuiWindowFlags_NoResize;
         buildMenu("Camera Feeds", &App::buildCameraSelectors, win_flags);
 
-        if (pip_enabled) { 
+        if (pip_enabled) {
+            win_flags = 0;
+            win_flags |= ImGuiWindowFlags_NoScrollbar;
+            win_flags |= ImGuiWindowFlags_NoResize;
             win_flags |= ImGuiWindowFlags_NoCollapse;
             win_flags |= ImGuiWindowFlags_NoSavedSettings;
             ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
