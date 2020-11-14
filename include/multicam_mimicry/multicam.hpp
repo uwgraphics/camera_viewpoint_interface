@@ -93,12 +93,12 @@ namespace multicam
 
     struct Camera
     {
-        std::string name, topic_name;
+        std::string name, topic_name, display_name;
         Image image;
 
-        Camera() : name(""), topic_name("") {}
-        Camera(std::string n, std::string t, uint w, uint h, uint c) : name(n), topic_name(t), 
-                image(Image(w, h, c)) {}
+        Camera() : name(""), topic_name(""), display_name("") {}
+        Camera(std::string n, std::string t, std::string d, uint w, uint h, uint c) : name(n), topic_name(t), 
+                display_name(d), image(Image(w, h, c)) {}
     };
 
     struct Mesh

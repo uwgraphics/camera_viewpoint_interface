@@ -124,10 +124,11 @@ bool App::parseCameraFile()
     uint num_cams = j["_num_cams"];
     for (uint i = 0; i < num_cams; i++) {
         std::string cam_id = "cam" + std::to_string(i);
-        std::string name, topic_name;
+        std::string name, topic_name, display_name;
         uint w, h, c;
 
         name = j[cam_id]["name"];
+        display_name = j[cam_id]["display_name"];
         topic_name = j[cam_id]["topic"];
         w = j[cam_id]["width"];
         h = j[cam_id]["height"];
@@ -143,7 +144,7 @@ bool App::parseCameraFile()
             max_channels = c;
         }
 
-        cam_info.insert(std::pair<uint, Camera>(i, Camera(name, topic_name, w, h, c)));
+        cam_info.insert(std::pair<uint, Camera>(i, Camera(name, topic_name, display_name, w, h, c)));
     }
 
     out_img = Image(max_width, max_height, max_channels);
@@ -734,13 +735,16 @@ int App::run(int argc, char *argv[])
         ImGuiWindowFlags win_flags = 0;
         win_flags |= ImGuiWindowFlags_NoScrollbar;
         win_flags |= ImGuiWindowFlags_NoResize;
-        buildMenu("Camera Feed", &App::buildCameraSelectors, win_flags);
+        buildMenu("Camera Feeds", &App::buildCameraSelectors, win_flags);
 
         if (pip_enabled) { 
-            win_flags |= ImGuiWindowFlags_NoTitleBar;
+            win_flags |= ImGuiWindowFlags_NoCollapse;
+            win_flags |= ImGuiWindowFlags_NoSavedSettings;
             ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
-
-            buildMenu("PiP Feed", &App::buildPiPWindow, win_flags);
+            ImGui::SetNextWindowPos(ImVec2(app_params.WINDOW_WIDTH - app_params.pip_width-120, app_params.WINDOW_HEIGHT - app_params.pip_height-100));
+            Camera pip_cam = cam_info.at(pip_camera);
+            std::string cam_name = pip_cam.display_name;
+            buildMenu(cam_name.c_str(), &App::buildPiPWindow, win_flags);
         }
 
         updateOutputImage();
