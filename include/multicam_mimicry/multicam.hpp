@@ -38,7 +38,7 @@ namespace multicam
 
     struct AppParams
     {
-        uint loop_rate = 120;
+        uint loop_rate = 60;
 
         // Starting window dimensions
         uint const WINDOW_WIDTH = 1200;
@@ -282,7 +282,7 @@ namespace multicam
         void initializeROS(int argc, char *argv[]);
         bool initializeGlfw();
         void initializeImGui();
-        void shutdown();
+        void shutdownApp();
 
         // Robot control
         void parseControllerInput(std::string data);

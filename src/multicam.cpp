@@ -2,6 +2,7 @@
 #include <iostream>
 #include <thread>
 #include <sys/socket.h>
+#include <poll.h>
 #include <netinet/in.h>
 
 // ROS
@@ -260,7 +261,7 @@ void App::initializeImGui()
     ImGui_ImplOpenGL3_Init("#version 330");
 }
 
-void App::shutdown()
+void App::shutdownApp()
 {
     if (ros::ok()) {
         ros::shutdown();
@@ -440,19 +441,22 @@ void App::publishRobotData()
 
 void App::handleRobotControl()
 {
-    // Get initial values
-    std::string input_data;
-    input_data = getSocketData(sock);
-    parseControllerInput(input_data);
+    pollfd poll_fds;
+    poll_fds.fd = sock.sock;
+    poll_fds.events = POLLIN; // Wait until there's data to read
 
     while (ros::ok() && !glfwWindowShouldClose(window))
     {
-        input_data = getSocketData(sock);
-        parseControllerInput(input_data);
-        printText(input.to_str(true));
-
-        publishRobotData();
+        if (poll(&poll_fds, 1, app_params.loop_rate) > 0) {
+            std::string input_data = getSocketData(sock);
+            parseControllerInput(input_data);
+            printText(input.to_str(true));
+        
+            publishRobotData();
+        }
     }
+
+    shutdown(sock.sock, SHUT_RDWR);
 }
 
 
@@ -786,7 +790,7 @@ int App::run(int argc, char *argv[])
         loop_rate.sleep();
     }
     robot_control.join();
-    shutdown();
+    shutdownApp();
 
     return 0;
 }
