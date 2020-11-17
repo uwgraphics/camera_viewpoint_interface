@@ -81,23 +81,61 @@ void printText(std::string text, int newlines, bool flush)
     return;
 }
 
+uint getNextIndex(uint ix, uint size)
+{
+    return (ix + 1) % size;
+}
+
+uint getPreviousIndex(uint ix, uint size)
+{
+    return (ix == 0) ? (size - 1) : (ix - 1);
+}
+
 void mismatchCameras(uint &cam1, uint &cam2, uint size)
 {
     if (cam1 == cam2) {
-        cam2 = (cam2 + 1) % size;
+        cam2 = getNextIndex(cam2, size);
     }
 }
 
-void nextCamera(uint &active, uint &pip, uint size)
+void nextCamera(uint &cam1, uint &cam2, uint size, bool bump)
 {
-    active = (active + 1) % size;
-    mismatchCameras(active, pip, size);
+    if (size < 2) {
+        cam1 = cam2 = 0;
+    }
+
+    if (bump) {
+        cam1 = getNextIndex(cam1, size);
+        mismatchCameras(cam1, cam2, size);
+    }
+    else {
+        uint next_cam = getNextIndex(cam1, size);
+        if (next_cam == cam2) {
+            next_cam = getNextIndex(next_cam, size);
+        }
+
+        cam1 = next_cam;
+    }
 }
 
-void previousCamera(uint &active, uint &pip, uint size)
+void previousCamera(uint &cam1, uint &cam2, uint size, bool bump)
 {
-    active = (active == 0) ? size-1 : active-1;
-    mismatchCameras(active, pip, size);
+    if (size < 2) {
+        cam1 = cam2 = 0;
+    }
+
+    if (bump) {
+        cam1 = getPreviousIndex(cam1, size);
+        mismatchCameras(cam1, cam2, size);
+    }
+    else {
+        uint next_cam = getPreviousIndex(cam1, size);
+        if (next_cam == cam2) {
+            next_cam = getPreviousIndex(next_cam, size);
+        }
+
+        cam1 = next_cam;
+    }
 }
 
 bool App::parseCameraFile()
@@ -369,10 +407,17 @@ void App::parseControllerInput(std::string data)
         else if (input.manual_offset.x <= -0.5) {
             previousCamera(active_camera, pip_camera, cam_info.size());
         }
+        else if (input.manual_offset.z >= 0.5) {
+            nextCamera(pip_camera, active_camera, cam_info.size(), false);
+        }
+        else if (input.manual_offset.z <= -0.5) {
+            previousCamera(pip_camera, active_camera, cam_info.size(), false);
+        }
         else {
             pip_enabled = !pip_enabled;
         }
     }
+
 
     // TODO: Consider how this should interact with clutching
     if (!input.reset.is_on() && input.reset.is_flipping()) {
@@ -382,6 +427,7 @@ void App::parseControllerInput(std::string data)
 
          input.inv_init_quat = glm::inverse(quat_vec);
     }
+    // TODO: Allow reset to work while clutching
 
     // TODO: **Add mode for using camera frame**
     if (!input.clutching.is_on() && !input.reset.is_on()) {
@@ -397,7 +443,7 @@ void App::parseControllerInput(std::string data)
     }
     else {
         // Clutching mode handling
-        // Note that the behavior of buttons changes while in this mode
+        // NOTE: The behavior of buttons changes while in this mode
     }
 }
 
@@ -415,9 +461,9 @@ void App::publishRobotData()
     pose.orientation.w = input.orientation.w;
 
     Pose pose_cam;
-    pose_cam.position.x = input.manual_offset.x;
-    pose_cam.position.y = input.manual_offset.y;
-    pose_cam.position.z = input.manual_offset.z;
+    // pose_cam.position.x = input.manual_offset.x;
+    // pose_cam.position.y = input.manual_offset.y;
+    // pose_cam.position.z = input.manual_offset.z;
 
     pose_cam.orientation.x = 0.0;
     pose_cam.orientation.y = 0.0;
@@ -690,7 +736,7 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
 int App::run(int argc, char *argv[])
 {
     // Change working directory so we can specify resources more easily
-    // Note that this depends on the 'cwd' param of the launch file being set to "node"
+    // NOTE: This depends on the 'cwd' param of the launch file being set to "node"
     chdir("../../../src/multicam_mimicry");
 
     if (!initialize(argc, argv)) {
@@ -730,11 +776,10 @@ int App::run(int argc, char *argv[])
     {
         glfwPollEvents();
 
-        // Start the Dear ImGui frame
+        // --- Build ImGui windows
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        // ImGui::ShowDemoWindow();
         
         ImGuiWindowFlags win_flags = 0;
         win_flags |= ImGuiWindowFlags_NoScrollbar;
@@ -753,6 +798,7 @@ int App::run(int argc, char *argv[])
             std::string cam_name = pip_cam.display_name;
             buildMenu(cam_name.c_str(), &App::buildPiPWindow, win_flags);
         }
+        // ---
 
         updateOutputImage();
         glActiveTexture(1);

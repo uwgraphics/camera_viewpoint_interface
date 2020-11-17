@@ -1,5 +1,5 @@
 {
-    "_num_cams": 2,
+    "_num_cams": 3,
     "cam0": {
         "name": "dynamic",
         "topic": "/cam/dyn_image",
@@ -12,6 +12,14 @@
         "name": "static",
         "topic": "/cam/stat_image",
         "display_name": "Static Camera",
+        "width": 1024,
+        "height": 1024,
+        "channels": 3
+    },
+    "cam2": {
+        "name": "wide",
+        "topic": "/cam/wide_image",
+        "display_name": "Wide Camera",
         "width": 1024,
         "height": 1024,
         "channels": 3

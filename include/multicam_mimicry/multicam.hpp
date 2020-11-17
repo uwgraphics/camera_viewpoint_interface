@@ -304,9 +304,11 @@ namespace multicam
 } // multicam
 
 void printText(std::string text="", int newlines=1, bool flush=false);
+uint getNextIndex(uint ix, uint size);
+uint getPreviousIndex(uint ix, uint size);
 void mismatchCameras(uint &cam1, uint &cam2, uint size);
-void nextCamera(uint &active, uint &pip, uint size);
-void previousCamera(uint &active, uint &pip, uint size);
+void nextCamera(uint &cam1, uint &cam2, uint size, bool bump=true);
+void previousCamera(uint &cam1, uint &cam2, uint size, bool bump=true);
 
 void glfwErrorCallback(int code, const char* description);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
