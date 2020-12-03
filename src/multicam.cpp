@@ -28,14 +28,16 @@
 #include "multicam_mimicry/json.hpp"
 #include "multicam_mimicry/multicam.hpp"
 #include "multicam_mimicry/shader.hpp"
-
+#include "multicam_mimicry/mesh.hpp"
+#include "multicam_mimicry/model.hpp"
+#include "multicam_mimicry/object.hpp"
 
 using json = nlohmann::json;
 using EEPoseGoals = relaxed_ik::EEPoseGoals;
 using Pose = geometry_msgs::Pose;
 using Bool = std_msgs::Bool;
 using App = multicam::App;
-using Mesh = multicam::Mesh;
+using MMesh = multicam::Mesh;
 using Image = multicam::Image;
 using Socket = multicam::Socket;
 
@@ -183,7 +185,7 @@ bool App::parseCameraFile()
             max_channels = c;
         }
 
-        cam_info.insert(std::pair<uint, Camera>(i, Camera(name, topic_name, display_name, w, h, c)));
+        cam_info.insert(std::pair<uint, CCamera>(i, CCamera(name, topic_name, display_name, w, h, c)));
     }
 
     out_img = Image(max_width, max_height, max_channels);
@@ -269,8 +271,12 @@ bool App::initializeGlfw()
         printText("Failed to initialize GLAD");
         return false;
     }
+
+    // Tells stb_image.h to flip loaded textures on y-axis
+    stbi_set_flip_vertically_on_load(true);
+
     glViewport(0, 0, app_params.WINDOW_WIDTH, app_params.WINDOW_HEIGHT);
-    // glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     
     glfwSetWindowUserPointer(window, this);
@@ -555,7 +561,7 @@ void Image::createTexture(uint tex_num)
 
 void App::updateOutputImage()
 {
-    Camera cur_cam = cam_info.at(active_camera);
+    CCamera cur_cam = cam_info.at(active_camera);
     uint cam_size = cur_cam.image.size;
 
     if (cam_size != out_img.size) {
@@ -570,7 +576,7 @@ void App::updateOutputImage()
 
 void App::updatePipImage()
 {
-    Camera cur_cam = cam_info.at(pip_camera);
+    CCamera cur_cam = cam_info.at(pip_camera);
     uint cam_size = cur_cam.image.size;
 
     if (cam_size != out_img.size) {
@@ -587,7 +593,7 @@ void App::updatePipImage()
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, pip_img.width, pip_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)pip_img.data.data());
 }
 
-Mesh generateSquare()
+MMesh generateSquare()
 {
     float vertices[] = {
         // positions          // colors           // texture coords
@@ -601,7 +607,7 @@ Mesh generateSquare()
         1, 2, 3  // second triangle
     };
 
-    Mesh mesh;
+    MMesh mesh;
 
     glGenVertexArrays(1, &mesh.VAO);
     glGenBuffers(1, &mesh.VBO);
@@ -733,6 +739,15 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
 }
 
 
+/* TODO
+ - Figure out texture naming system
+ - Integrate new mesh loading system into program
+ - Start adding 3D widgets
+ - Implement object management system
+ - Implement display management system
+ - Implement Timer and Cursor
+*/
+
 int App::run(int argc, char *argv[])
 {
     // Change working directory so we can specify resources more easily
@@ -744,7 +759,7 @@ int App::run(int argc, char *argv[])
     }
 
     // Set up camera textures
-    Mesh img_surface = generateSquare();
+    MMesh img_surface = generateSquare();
     out_img.createTexture(0);
 
     cv::Mat overlay_img = cv::imread("resources/textures/multicam_overlay.png");
@@ -762,10 +777,24 @@ int App::run(int argc, char *argv[])
     pip_img.createTexture(2);
 
 
-    Shader bg_shader("resources/shaders/bg_shader.vert", "resources/shaders/bg_shader.frag");
+    // -- Set up shaders --
+    std::string base_path("resources/shaders/");
+
+    Shader bg_shader((base_path + "bg_shader.vert").c_str(), (base_path + "bg_shader.frag").c_str());
     bg_shader.use();
     bg_shader.setInt("Texture", 0);
     bg_shader.setInt("Overlay", 1);
+
+    Shader backpack_shader((base_path + "backpack.vert").c_str(), (base_path + "backpack.frag").c_str());
+    // ----
+
+    // -- Model loading --
+    base_path = "resources/models/";
+
+    // Model backpack(base_path + "backpack/backpack.obj");
+    Model arrow(base_path + "arrow/arrow.obj");
+    // ----
+
 
     // Split robot control into its own thread to improve performance
     std::thread robot_control(&App::handleRobotControl, this);
@@ -794,7 +823,7 @@ int App::run(int argc, char *argv[])
             win_flags |= ImGuiWindowFlags_NoSavedSettings;
             ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
             ImGui::SetNextWindowPos(ImVec2(app_params.WINDOW_WIDTH - app_params.pip_width-120, app_params.WINDOW_HEIGHT - app_params.pip_height-100));
-            Camera pip_cam = cam_info.at(pip_camera);
+            CCamera pip_cam = cam_info.at(pip_camera);
             std::string cam_name = pip_cam.display_name;
             buildMenu(cam_name.c_str(), &App::buildPiPWindow, win_flags);
         }
@@ -814,8 +843,24 @@ int App::run(int argc, char *argv[])
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glBindVertexArray(img_surface.VAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        backpack_shader.use();
+
+        // View/projection transformations
+        glm::mat4 projection = glm::perspective(glm::radians(scene_cam.Zoom), (float)app_params.WINDOW_WIDTH / (float)app_params.WINDOW_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 view = scene_cam.GetViewMatrix();
+        backpack_shader.setMat4("projection", projection);
+        backpack_shader.setMat4("view", view);
+
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
+        backpack_shader.setMat4("model", model);
+        arrow.Draw(backpack_shader);
+
+
+        // glBindVertexArray(img_surface.VAO);
+        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

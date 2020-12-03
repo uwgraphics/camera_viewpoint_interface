@@ -119,6 +119,7 @@ add_subdirectory(include/glfw)
 # add_executable(${PROJECT_NAME}_node src/openvr_ros_ws_node.cpp)
 
 add_compile_definitions(IMGUI_IMPL_OPENGL_LOADER_GLAD)
+add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 
 add_executable(multicam
   src/multicam.cpp
@@ -145,6 +146,7 @@ add_dependencies(multicam ${catkin_EXPORTED_TARGETS})
 ## Specify libraries to link a library or executable target against
 target_link_libraries(multicam
   glfw
+  assimp
   dl
   ${OpenCV_LIBRARIES}
   ${catkin_LIBRARIES}

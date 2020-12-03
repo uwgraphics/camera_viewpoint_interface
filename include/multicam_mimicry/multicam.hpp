@@ -21,6 +21,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "multicam_mimicry/shader.hpp"
+#include "multicam_mimicry/camera.hpp"
 
 
 namespace multicam
@@ -91,13 +92,13 @@ namespace multicam
         }
     };
 
-    struct Camera
+    struct CCamera
     {
         std::string name, topic_name, display_name;
         Image image;
 
-        Camera() : name(""), topic_name(""), display_name("") {}
-        Camera(std::string n, std::string t, std::string d, uint w, uint h, uint c) : name(n), topic_name(t), 
+        CCamera() : name(""), topic_name(""), display_name("") {}
+        CCamera(std::string n, std::string t, std::string d, uint w, uint h, uint c) : name(n), topic_name(t), 
                 display_name(d), image(Image(w, h, c)) {}
     };
 
@@ -242,6 +243,7 @@ namespace multicam
         {
             pip_enabled = clutch_mode = false;
             active_camera = pip_camera = 0;
+            scene_cam = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
             // TODO: Add config for cams
         }
@@ -253,7 +255,8 @@ namespace multicam
         AppParams app_params;
         Input input;
         Socket sock;
-        std::map<uint, Camera> cam_info;
+        Camera scene_cam;
+        std::map<uint, CCamera> cam_info;
         uint active_camera;
         bool pip_enabled; // pip = Picture-in-picture
         uint pip_tex;
