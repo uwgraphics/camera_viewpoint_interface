@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   message_generation
   geometry_msgs
+  relaxed_ik
   sensor_msgs
   cv_bridge
 )
@@ -126,6 +127,7 @@ add_executable(multicam
   src/imgui_demo.cpp
   src/imgui_draw.cpp
   src/imgui_widgets.cpp
+  src/imgui_tables.cpp
   src/imgui_impl_opengl3.cpp
   src/imgui_impl_glfw.cpp
 )
@@ -139,7 +141,7 @@ add_executable(multicam
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(multicam ${catkin_EXPORTED_TARGETS})
+add_dependencies(multicam ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(multicam
