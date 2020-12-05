@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.12.4)
 project(multicam_mimicry)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
@@ -12,7 +12,6 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   message_generation
   geometry_msgs
-  relaxed_ik
   sensor_msgs
   cv_bridge
 )
