@@ -743,7 +743,7 @@ int App::run(int argc, char *argv[])
 {
     // Change working directory so we can specify resources more easily
     // NOTE: This depends on the 'cwd' param of the launch file being set to "node"
-    chdir("../../../src/multicam_mimicry");
+    chdir("../../../src/camera_viewpoint_interface");
 
     if (!initialize(argc, argv)) {
         return -1;
