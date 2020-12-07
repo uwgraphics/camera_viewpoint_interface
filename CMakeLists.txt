@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12.4)
-project(multicam_mimicry)
+project(viewpoint_interface)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -121,8 +121,8 @@ add_subdirectory(include/glfw)
 add_compile_definitions(IMGUI_IMPL_OPENGL_LOADER_GLAD)
 add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 
-add_executable(multicam
-  src/multicam.cpp
+add_executable(viewpoint_interface
+  src/viewpoint_interface.cpp
   src/glad.c
   src/imgui.cpp
   src/imgui_demo.cpp
@@ -141,10 +141,10 @@ add_executable(multicam
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(multicam ${catkin_EXPORTED_TARGETS})
+add_dependencies(viewpoint_interface ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(multicam
+target_link_libraries(viewpoint_interface
   glfw
   assimp
   dl

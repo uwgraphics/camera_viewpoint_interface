@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+   <node pkg="viewpoint_interface" type="viewpoint_interface" name="viewpoint_interface" 
+         output="screen" cwd="node"/>
+</launch>
