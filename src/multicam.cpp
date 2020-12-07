@@ -739,15 +739,6 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
 }
 
 
-/* TODO
- - Figure out texture naming system
- - Integrate new mesh loading system into program
- - Start adding 3D widgets
- - Implement object management system
- - Implement display management system
- - Implement Timer and Cursor
-*/
-
 int App::run(int argc, char *argv[])
 {
     // Change working directory so we can specify resources more easily
