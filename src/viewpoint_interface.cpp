@@ -25,12 +25,12 @@
 #include "imgui_impl_opengl3.h"
 
 // Custom headers
-#include "multicam_mimicry/json.hpp"
-#include "multicam_mimicry/multicam.hpp"
-#include "multicam_mimicry/shader.hpp"
-#include "multicam_mimicry/mesh.hpp"
-#include "multicam_mimicry/model.hpp"
-#include "multicam_mimicry/object.hpp"
+#include "viewpoint_interface/json.hpp"
+#include "viewpoint_interface/multicam.hpp"
+#include "viewpoint_interface/shader.hpp"
+#include "viewpoint_interface/mesh.hpp"
+#include "viewpoint_interface/model.hpp"
+#include "viewpoint_interface/object.hpp"
 
 using json = nlohmann::json;
 using EEPoseGoals = relaxed_ik::EEPoseGoals;

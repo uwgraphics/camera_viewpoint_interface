@@ -20,8 +20,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include "multicam_mimicry/shader.hpp"
-#include "multicam_mimicry/camera.hpp"
+#include "viewpoint_interface/shader.hpp"
+#include "viewpoint_interface/camera.hpp"
 
 
 namespace multicam
