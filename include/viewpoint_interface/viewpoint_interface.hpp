@@ -92,13 +92,13 @@ namespace multicam
         }
     };
 
-    struct CCamera
+    struct Display
     {
         std::string name, topic_name, display_name;
         Image image;
 
-        CCamera() : name(""), topic_name(""), display_name("") {}
-        CCamera(std::string n, std::string t, std::string d, uint w, uint h, uint c) : name(n), topic_name(t), 
+        Display() : name(""), topic_name(""), display_name("") {}
+        Display(std::string n, std::string t, std::string d, uint w, uint h, uint c) : name(n), topic_name(t), 
                 display_name(d), image(Image(w, h, c)) {}
     };
 
@@ -192,15 +192,10 @@ namespace multicam
 
     struct Input
     {
-        glm::vec3 init_pos, position, prev_pos, debug_pos;
-        glm::quat init_orient, orientation;
         glm::vec3 cam_pos, manual_offset;
         glm::quat cam_orient;
-        glm::quat inv_init_quat;
         bool initialized;
-        Switch gripping;
         Switch manual_adj;
-        Switch reset;
         Switch clutching;
         glm::vec3 clutch_offset;
         cv_bridge::CvImagePtr cur_img;
@@ -209,13 +204,9 @@ namespace multicam
 
         Input()
         {
-            init_pos, position, prev_pos, debug_pos = glm::vec3();
             cam_pos, manual_offset = glm::vec3();
-            init_orient, orientation, cam_orient = glm::quat();
             initialized = false;
-            gripping = Switch(); // Gripper starts open
             manual_adj = Switch(false, Switch::Type::HOLD);
-            reset = Switch();
             clutching = Switch(false, Switch::Type::SINGLE);
             clutch_offset = glm::vec3();
             dyn_valid, stat_valid = false;
@@ -224,12 +215,8 @@ namespace multicam
         std::string to_str(bool show_euler=false)
         {
             std::string content;
-            content  = "Position: " + glm::to_string(position) + "\n";
-            content += "Orientation: " + glm::to_string(orientation) + "\n";
             content += "Manual Adj: \t" + manual_adj.to_str();
             content +=  "\t" + glm::to_string(manual_offset) + "\n";
-            content += "Grip: " + gripping.to_str() + "\n";
-            content += "Reset: " + reset.to_str() + "\n";
             content += "Clutch: " + clutching.to_str() + "\n";
 
             return content;
@@ -256,7 +243,7 @@ namespace multicam
         Input input;
         Socket sock;
         Camera scene_cam;
-        std::map<uint, CCamera> cam_info;
+        std::map<uint, Display> cam_info;
         uint active_camera;
         bool pip_enabled; // pip = Picture-in-picture
         uint pip_tex;

@@ -180,7 +180,7 @@ bool App::parseCameraFile()
             max_channels = c;
         }
 
-        cam_info.insert(std::pair<uint, CCamera>(i, CCamera(name, topic_name, display_name, w, h, c)));
+        cam_info.insert(std::pair<uint, Display>(i, Display(name, topic_name, display_name, w, h, c)));
     }
 
     out_img = Image(max_width, max_height, max_channels);
@@ -327,20 +327,11 @@ void App::parseControllerInput(std::string data)
 
     json j = json::parse(data);
 
-    auto pos = j[CONTR_NAME]["pose"]["position"];
-    glm::vec3 pos_vec = glm::vec3(pos["x"], pos["y"], pos["z"]);
-
-    auto quat = j[CONTR_NAME]["pose"]["orientation"];
-    glm::quat quat_vec = glm::quat(quat["w"], quat["x"], quat["y"], quat["z"]);
-
-    input.gripping = j[CONTR_NAME]["gripper"]["boolean"];
     input.clutching = j[CONTR_NAME]["clutch"]["boolean"];
 
     input.manual_adj = j[CONTR_NAME]["manual_adj"]["boolean"];
     input.manual_offset.x = j[CONTR_NAME]["manual_adj"]["2d"]["x"];
     input.manual_offset.z = j[CONTR_NAME]["manual_adj"]["2d"]["y"];
-
-    input.reset = j[CONTR_NAME]["reset"]["boolean"];
 
     if (!input.initialized) {
     }
@@ -376,20 +367,6 @@ void App::parseControllerInput(std::string data)
         else {
             pip_enabled = !pip_enabled;
         }
-    }
-
-
-    // TODO: Consider how this should interact with clutching
-    if (!input.reset.is_on() && input.reset.is_flipping()) {
-    }
-    // TODO: Allow reset to work while clutching
-
-    // TODO: **Add mode for using camera frame**
-    if (!input.clutching.is_on() && !input.reset.is_on()) {
-    }
-    else {
-        // Clutching mode handling
-        // NOTE: The behavior of buttons changes while in this mode
     }
 }
 
@@ -462,7 +439,7 @@ void Image::createTexture(uint tex_num)
 
 void App::updateOutputImage()
 {
-    CCamera cur_cam = cam_info.at(active_camera);
+    Display cur_cam = cam_info.at(active_camera);
     uint cam_size = cur_cam.image.size;
 
     if (cam_size != out_img.size) {
@@ -477,7 +454,7 @@ void App::updateOutputImage()
 
 void App::updatePipImage()
 {
-    CCamera cur_cam = cam_info.at(pip_camera);
+    Display cur_cam = cam_info.at(pip_camera);
     uint cam_size = cur_cam.image.size;
 
     if (cam_size != out_img.size) {
@@ -708,7 +685,7 @@ int App::run(int argc, char *argv[])
             win_flags |= ImGuiWindowFlags_NoSavedSettings;
             ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
             ImGui::SetNextWindowPos(ImVec2(app_params.WINDOW_WIDTH - app_params.pip_width-120, app_params.WINDOW_HEIGHT - app_params.pip_height-100));
-            CCamera pip_cam = cam_info.at(pip_camera);
+            Display pip_cam = cam_info.at(pip_camera);
             std::string cam_name = pip_cam.display_name;
             buildMenu(cam_name.c_str(), &App::buildPiPWindow, win_flags);
         }
