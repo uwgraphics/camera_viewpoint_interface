@@ -6,11 +6,8 @@
 #include <netinet/in.h>
 
 // ROS
-#include <geometry_msgs/Pose.h>
-#include <sensor_msgs/Joy.h>
 #include <sensor_msgs/Image.h>
 #include <std_msgs/Bool.h>
-#include <relaxed_ik/EEPoseGoals.h>
 #include <sensor_msgs/image_encodings.h>
 
 // OpenCV
@@ -26,15 +23,13 @@
 
 // Custom headers
 #include "viewpoint_interface/json.hpp"
-#include "viewpoint_interface/multicam.hpp"
+#include "viewpoint_interface/viewpoint_interface.hpp"
 #include "viewpoint_interface/shader.hpp"
 #include "viewpoint_interface/mesh.hpp"
 #include "viewpoint_interface/model.hpp"
 #include "viewpoint_interface/object.hpp"
 
 using json = nlohmann::json;
-using EEPoseGoals = relaxed_ik::EEPoseGoals;
-using Pose = geometry_msgs::Pose;
 using Bool = std_msgs::Bool;
 using App = multicam::App;
 using MMesh = multicam::Mesh;
@@ -236,12 +231,7 @@ void App::initializeROS(int argc, char *argv[])
 {
     ros::init(argc, argv, "ros_openvr");
     ros::NodeHandle n;
-
-    ee_pub = n.advertise<relaxed_ik::EEPoseGoals>("/relaxed_ik/ee_pose_goals", 1000);
-    gripper_pub = n.advertise<std_msgs::Bool>("/relaxed_ik/gripper_state", 1000);
-    reset_pub = n.advertise<std_msgs::Bool>("/relaxed_ik/reset_pose", 1000);
     
-    // cam_pos_sub(n.subscribe<geometry_msgs::Pose>("/cam/pose_actual", 10, cameraCallback);
     for (int i = 0; i < cam_info.size(); i++) {
         ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(cam_info[i].topic_name, 10, boost::bind(&App::cameraImageCallback, this, _1, i)));
         cam_subs.push_back(cam_sub);
@@ -319,35 +309,7 @@ void App::shutdownApp()
 }
 
 
-// -- Robot control --
-glm::vec3 positionToRobotFrame(glm::vec3 v)
-{
-    return glm::vec3(-v.y, -v.z, v.x);
-}
-
-glm::quat orientationToRobotFrame(glm::quat quat_in)
-{
-    glm::vec3 new_euler = glm::vec3(glm::pitch(quat_in), -glm::roll(quat_in), -glm::yaw(quat_in));
-    glm::quat new_quat = glm::quat(new_euler);
-
-    return new_quat;
-}
-
-glm::mat4 translation_matrix(glm::vec3 coords)
-{
-    glm::mat4 mat = glm::mat4();
-    mat[0][3] = coords.x;
-    mat[1][3] = coords.y;
-    mat[2][3] = coords.z;
-
-    return mat;
-}
-
-glm::vec3 translation_from_matrix(glm::mat4 mat)
-{
-    return glm::vec3(mat[0][3], mat[1][3], mat[2][3]);
-}
-
+// Input handling
 std::string getSocketData(Socket &sock)
 {
     int len_data;
@@ -358,6 +320,7 @@ std::string getSocketData(Socket &sock)
     return data;
 }
 
+// TODO: Change all robot control code
 void App::parseControllerInput(std::string data)
 {
     std::string CONTR_NAME = app_params.CONTR_NAME;
@@ -380,13 +343,6 @@ void App::parseControllerInput(std::string data)
     input.reset = j[CONTR_NAME]["reset"]["boolean"];
 
     if (!input.initialized) {
-        input.init_pos = pos_vec;
-        input.prev_pos = pos_vec;
-        input.init_orient = quat_vec;
-
-        input.inv_init_quat = glm::inverse(quat_vec);
-
-        input.initialized = true;
     }
 
     // Handle clutching enabled by keyboard
@@ -397,12 +353,10 @@ void App::parseControllerInput(std::string data)
     if (input.clutching.is_flipping()) {
         if (input.clutching.is_on()) { // When just turned on
             clutch_mode = true;
-            input.clutch_offset = pos_vec - input.init_pos;
             // TODO: Add orientation handling
         }
         else {
             clutch_mode = false;
-            input.init_pos = pos_vec - input.clutch_offset;
         }
     }
 
@@ -427,25 +381,11 @@ void App::parseControllerInput(std::string data)
 
     // TODO: Consider how this should interact with clutching
     if (!input.reset.is_on() && input.reset.is_flipping()) {
-        input.init_pos = pos_vec;
-        input.prev_pos = pos_vec;
-        input.init_orient = quat_vec;
-
-         input.inv_init_quat = glm::inverse(quat_vec);
     }
     // TODO: Allow reset to work while clutching
 
     // TODO: **Add mode for using camera frame**
     if (!input.clutching.is_on() && !input.reset.is_on()) {
-        input.position = pos_vec - input.init_pos;
-        input.position = glm::rotate(input.init_orient, input.position);
-        glm::mat4 trans_mat = glm::toMat4(input.cam_orient) * translation_matrix(input.position);
-        input.position = translation_from_matrix(trans_mat);
-        input.orientation = input.inv_init_quat * quat_vec; // Displacement b/w quats
-
-        input.position = positionToRobotFrame(input.position);
-        // input.manual_offset = positionToRobotFrame(input.manual_offset);
-        input.orientation = orientationToRobotFrame(input.orientation);
     }
     else {
         // Clutching mode handling
@@ -453,44 +393,7 @@ void App::parseControllerInput(std::string data)
     }
 }
 
-void App::publishRobotData()
-{
-    EEPoseGoals goal;
-    Pose pose;
-    pose.position.x = input.position.x;
-    pose.position.y = input.position.y;
-    pose.position.z = input.position.z;
-
-    pose.orientation.x = input.orientation.x;
-    pose.orientation.y = input.orientation.y;
-    pose.orientation.z = input.orientation.z;
-    pose.orientation.w = input.orientation.w;
-
-    Pose pose_cam;
-    // pose_cam.position.x = input.manual_offset.x;
-    // pose_cam.position.y = input.manual_offset.y;
-    // pose_cam.position.z = input.manual_offset.z;
-
-    pose_cam.orientation.x = 0.0;
-    pose_cam.orientation.y = 0.0;
-    pose_cam.orientation.z = 0.0;
-    pose_cam.orientation.w = 1.0;
-
-    goal.header.stamp = ros::Time::now();
-    goal.ee_poses.push_back(pose);
-    goal.ee_poses.push_back(pose_cam);
-
-    ee_pub.publish(goal);
-
-    input.prev_pos = glm::vec3(input.position.x, input.position.y, input.position.z);
-
-
-    Bool gripping;
-    gripping.data = input.gripping.is_on();
-
-    gripper_pub.publish(gripping);        
-}
-
+// TODO: No longer robot control--only handles controller input
 void App::handleRobotControl()
 {
     pollfd poll_fds;
@@ -502,9 +405,7 @@ void App::handleRobotControl()
         if (poll(&poll_fds, 1, app_params.loop_rate) > 0) {
             std::string input_data = getSocketData(sock);
             parseControllerInput(input_data);
-            printText(input.to_str(true));
-        
-            publishRobotData();
+            printText(input.to_str(true));        
         }
     }
 
@@ -708,13 +609,6 @@ void App::buildPiPWindow()
 
 
 // -- ROS Callbacks --
-// void cameraPoseCallback(const geometry_msgs::Pose::ConstPtr& msg, ControllerInput& input)
-// {
-//     auto pos = msg->position;
-//     auto quat = msg->orientation;
-//     input.cam_pos = glm::vec3(pos.x, pos.y, pos.z);
-//     input.cam_orient = glm::quat(quat.w, quat.x, quat.y, quat.z);
-// }
 
 void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
 {

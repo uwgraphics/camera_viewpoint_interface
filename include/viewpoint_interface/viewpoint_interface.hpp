@@ -287,9 +287,8 @@ namespace multicam
         void initializeImGui();
         void shutdownApp();
 
-        // Robot control
+        // Input handling
         void parseControllerInput(std::string data);
-        void publishRobotData();
         void handleRobotControl();
 
         void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index);
@@ -316,10 +315,6 @@ void previousCamera(uint &cam1, uint &cam2, uint size, bool bump=true);
 void glfwErrorCallback(int code, const char* description);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 
-glm::vec3 positionToRobotFrame(glm::vec3 v);
-glm::quat orientationToRobotFrame(glm::quat quat_in);
-glm::mat4 translation_matrix(glm::vec3 coords);
-glm::vec3 translation_from_matrix(glm::mat4 mat);
 std::string getData(multicam::Socket &sock);
 
 multicam::Mesh generateSquare();

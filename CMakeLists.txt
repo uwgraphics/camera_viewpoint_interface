@@ -11,8 +11,6 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs 
   roscpp
   message_generation
-  geometry_msgs
-  relaxed_ik
   sensor_msgs
   cv_bridge
 )
@@ -89,7 +87,7 @@ find_package(OpenCV)
 catkin_package(
    INCLUDE_DIRS include
 #   LIBRARIES vectors
-   CATKIN_DEPENDS roscpp std_msgs relaxed_ik geometry_msgs
+   CATKIN_DEPENDS roscpp std_msgs
 #  DEPENDS system_lib
 )
 
