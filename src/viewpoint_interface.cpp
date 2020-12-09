@@ -7,7 +7,6 @@
 
 // ROS
 #include <sensor_msgs/Image.h>
-#include <std_msgs/Bool.h>
 #include <sensor_msgs/image_encodings.h>
 
 // OpenCV
@@ -30,7 +29,6 @@
 #include "viewpoint_interface/object.hpp"
 
 using json = nlohmann::json;
-using Bool = std_msgs::Bool;
 using App = multicam::App;
 using MMesh = multicam::Mesh;
 using Image = multicam::Image;
