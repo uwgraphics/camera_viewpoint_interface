@@ -1,5 +1,5 @@
-#ifndef __MULTICAM_HPP__
-#define __MULTICAM_HPP__
+#ifndef __VIEWPOINT_INTERFACE_HPP__
+#define __VIEWPOINT_INTERFACE_HPP__
 
 #include <string>
 #include <vector>
@@ -13,18 +13,13 @@
 #include <glm/vec3.hpp> // glm::vec3
 #include <glm/vec4.hpp> // glm::vec4
 #include <glm/mat4x4.hpp> // glm::mat4
-#include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
-#include <glm/ext/matrix_clip_space.hpp> // glm::perspective
-#include <glm/ext/scalar_constants.hpp> // glm::pi
 #include <glm/gtx/string_cast.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/quaternion.hpp>
 
 #include "viewpoint_interface/shader.hpp"
-#include "viewpoint_interface/camera.hpp"
+#include "viewpoint_interface/scene_camera.hpp"
 
 
-namespace multicam
+namespace viewpoint_interface
 {
     struct Socket
     {
@@ -48,10 +43,9 @@ namespace multicam
         uint pip_width = WINDOW_WIDTH * 0.25;
         uint pip_height = WINDOW_HEIGHT * 0.25;
 
-        uint def_cam_height = 1024;
-        uint def_cam_width = 1024;
-        uint def_cam_channels = 3;
-        uint total_cameras = 2;
+        uint def_disp_height = 1024;
+        uint def_disp_width = 1024;
+        uint def_disp_channels = 3;
         std::string cam_config_file = "resources/config/cam_config.json";
         const std::string CONTR_NAME = "vive_controller";
     };
@@ -192,8 +186,7 @@ namespace multicam
 
     struct Input
     {
-        glm::vec3 cam_pos, manual_offset;
-        glm::quat cam_orient;
+        glm::vec3 manual_offset;
         bool initialized;
         Switch manual_adj;
         Switch clutching;
@@ -204,7 +197,7 @@ namespace multicam
 
         Input()
         {
-            cam_pos, manual_offset = glm::vec3();
+            manual_offset = glm::vec3();
             initialized = false;
             manual_adj = Switch(false, Switch::Type::HOLD);
             clutching = Switch(false, Switch::Type::SINGLE);
@@ -229,10 +222,7 @@ namespace multicam
         App(AppParams params = AppParams()) : app_params(params)
         {
             pip_enabled = clutch_mode = false;
-            active_camera = pip_camera = 0;
-            scene_cam = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
-
-            // TODO: Add config for cams
+            active_display = pip_display = 0;
         }
 
         int run(int argc, char *argv[]);
@@ -242,20 +232,14 @@ namespace multicam
         AppParams app_params;
         Input input;
         Socket sock;
-        Camera scene_cam;
-        std::map<uint, Display> cam_info;
-        uint active_camera;
+        std::map<uint, Display> disp_info;
+        uint active_display;
         bool pip_enabled; // pip = Picture-in-picture
         uint pip_tex;
-        uint pip_camera;
+        uint pip_display;
         bool clutch_mode;
 
         // ROS
-        ros::Publisher ee_pub;
-        ros::Publisher gripper_pub;
-        ros::Publisher reset_pub;
-
-        ros::Subscriber cam_pos_sub;
         std::vector<ros::Subscriber> cam_subs;
 
         // GUI
@@ -286,25 +270,25 @@ namespace multicam
         
         // Dear ImGui
         void buildMenu(const char *title, void (App::*build_func)(void), ImGuiWindowFlags window_flags = 0);
-        void buildCameraSelectors();
+        void buildDisplaySelectors();
         void buildPiPWindow();
     };
 
-} // multicam
+} // viewpoint_interface
 
 void printText(std::string text="", int newlines=1, bool flush=false);
 uint getNextIndex(uint ix, uint size);
 uint getPreviousIndex(uint ix, uint size);
-void mismatchCameras(uint &cam1, uint &cam2, uint size);
-void nextCamera(uint &cam1, uint &cam2, uint size, bool bump=true);
-void previousCamera(uint &cam1, uint &cam2, uint size, bool bump=true);
+void mismatchDisplays(uint &disp1, uint &disp2, uint size);
+void nextDisplay(uint &disp1, uint &disp2, uint size, bool bump=true);
+void previousDisplay(uint &disp1, uint &disp2, uint size, bool bump=true);
 
 void glfwErrorCallback(int code, const char* description);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 
-std::string getData(multicam::Socket &sock);
+std::string getData(viewpoint_interface::Socket &sock);
 
-multicam::Mesh generateSquare();
+viewpoint_interface::Mesh generateSquare();
 
 
-#endif // __MULTICAM_HPP__
+#endif // __VIEWPOINT_INTERFACE_HPP__

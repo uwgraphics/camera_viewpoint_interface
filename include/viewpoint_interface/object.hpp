@@ -5,21 +5,21 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "shader.hpp"
-#include "camera.hpp"
+#include "scene_camera.hpp"
 #include "model.hpp"
 
 
 class Object
 {
 public:
-    Object(Shader &shdr, Camera &cam, Model &mdl, glm::vec3 pos, glm::vec3 scl)
+    Object(Shader &shdr, SceneCamera &cam, Model &mdl, glm::vec3 pos, glm::vec3 scl)
             : shader(shdr), camera(cam), model(mdl), position(pos), scale(scl) {}
 
 private:
     glm::vec3 position;
     glm::vec3 scale;
     Shader &shader;
-    Camera &camera;
+    SceneCamera &camera;
     Model &model;
 };
 

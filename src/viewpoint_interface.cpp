@@ -29,17 +29,18 @@
 #include "viewpoint_interface/object.hpp"
 
 using json = nlohmann::json;
-using App = multicam::App;
-using MMesh = multicam::Mesh;
-using Image = multicam::Image;
-using Socket = multicam::Socket;
+using App = viewpoint_interface::App;
+using AppParams = viewpoint_interface::AppParams;
+using MMesh = viewpoint_interface::Mesh;
+using Image = viewpoint_interface::Image;
+using Socket = viewpoint_interface::Socket;
 
 
 /**
  * Entry point to the application.
  */
 int main(int argc, char *argv[])
-{    
+{   
     App app = App();
     app.run(argc, argv);
     return 0;
@@ -86,50 +87,50 @@ uint getPreviousIndex(uint ix, uint size)
     return (ix == 0) ? (size - 1) : (ix - 1);
 }
 
-void mismatchCameras(uint &cam1, uint &cam2, uint size)
+void mismatchDisplays(uint &disp1, uint &disp2, uint size)
 {
-    if (cam1 == cam2) {
-        cam2 = getNextIndex(cam2, size);
+    if (disp1 == disp2) {
+        disp2 = getNextIndex(disp2, size);
     }
 }
 
-void nextCamera(uint &cam1, uint &cam2, uint size, bool bump)
+void nextDisplay(uint &disp1, uint &disp2, uint size, bool bump)
 {
     if (size < 2) {
-        cam1 = cam2 = 0;
+        disp1 = disp2 = 0;
     }
 
     if (bump) {
-        cam1 = getNextIndex(cam1, size);
-        mismatchCameras(cam1, cam2, size);
+        disp1 = getNextIndex(disp1, size);
+        mismatchDisplays(disp1, disp2, size);
     }
     else {
-        uint next_cam = getNextIndex(cam1, size);
-        if (next_cam == cam2) {
-            next_cam = getNextIndex(next_cam, size);
+        uint next_disp = getNextIndex(disp1, size);
+        if (next_disp == disp2) {
+            next_disp = getNextIndex(next_disp, size);
         }
 
-        cam1 = next_cam;
+        disp1 = next_disp;
     }
 }
 
-void previousCamera(uint &cam1, uint &cam2, uint size, bool bump)
+void previousDisplay(uint &disp1, uint &disp2, uint size, bool bump)
 {
     if (size < 2) {
-        cam1 = cam2 = 0;
+        disp1 = disp2 = 0;
     }
 
     if (bump) {
-        cam1 = getPreviousIndex(cam1, size);
-        mismatchCameras(cam1, cam2, size);
+        disp1 = getPreviousIndex(disp1, size);
+        mismatchDisplays(disp1, disp2, size);
     }
     else {
-        uint next_cam = getPreviousIndex(cam1, size);
-        if (next_cam == cam2) {
-            next_cam = getPreviousIndex(next_cam, size);
+        uint next_disp = getPreviousIndex(disp1, size);
+        if (next_disp == disp2) {
+            next_disp = getPreviousIndex(next_disp, size);
         }
 
-        cam1 = next_cam;
+        disp1 = next_disp;
     }
 }
 
@@ -178,7 +179,7 @@ bool App::parseCameraFile()
             max_channels = c;
         }
 
-        cam_info.insert(std::pair<uint, Display>(i, Display(name, topic_name, display_name, w, h, c)));
+        disp_info.insert(std::pair<uint, Display>(i, Display(name, topic_name, display_name, w, h, c)));
     }
 
     out_img = Image(max_width, max_height, max_channels);
@@ -188,7 +189,7 @@ bool App::parseCameraFile()
 
 bool App::initialize(int argc, char *argv[])
 {
-    // This must run first so that camera settings are initialized
+    // This must run first so that display settings are initialized
     if (!parseCameraFile()) {
         return false;
     } 
@@ -230,8 +231,8 @@ void App::initializeROS(int argc, char *argv[])
     ros::init(argc, argv, "ros_openvr");
     ros::NodeHandle n;
     
-    for (int i = 0; i < cam_info.size(); i++) {
-        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(cam_info[i].topic_name, 10, boost::bind(&App::cameraImageCallback, this, _1, i)));
+    for (int i = 0; i < disp_info.size(); i++) {
+        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(disp_info[i].topic_name, 10, boost::bind(&App::cameraImageCallback, this, _1, i)));
         cam_subs.push_back(cam_sub);
     }
 }
@@ -248,7 +249,7 @@ bool App::initializeGlfw()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(app_params.WINDOW_WIDTH, app_params.WINDOW_HEIGHT, "Camera Feed", NULL, NULL);
+    window = glfwCreateWindow(app_params.WINDOW_WIDTH, app_params.WINDOW_HEIGHT, "Viewpoint Selection Interface", NULL, NULL);
     if (!window) {
         printText("Could not create window.");
         return false;
@@ -351,16 +352,16 @@ void App::parseControllerInput(std::string data)
 
     if (input.manual_adj.confirm_flip_on()) {
         if (input.manual_offset.x >= 0.5) {
-            nextCamera(active_camera, pip_camera, cam_info.size());
+            nextDisplay(active_display, pip_display, disp_info.size());
         }
         else if (input.manual_offset.x <= -0.5) {
-            previousCamera(active_camera, pip_camera, cam_info.size());
+            previousDisplay(active_display, pip_display, disp_info.size());
         }
         else if (input.manual_offset.z >= 0.5) {
-            nextCamera(pip_camera, active_camera, cam_info.size(), false);
+            nextDisplay(pip_display, active_display, disp_info.size(), false);
         }
         else if (input.manual_offset.z <= -0.5) {
-            previousCamera(pip_camera, active_camera, cam_info.size(), false);
+            previousDisplay(pip_display, active_display, disp_info.size(), false);
         }
         else {
             pip_enabled = !pip_enabled;
@@ -412,7 +413,7 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
         glfwSetWindowShouldClose(window, true);
     }
     else if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        nextCamera(active_camera, pip_camera, cam_info.size());
+        nextDisplay(active_display, pip_display, disp_info.size());
     }
     else if (key == GLFW_KEY_C && action == GLFW_PRESS) {
         clutch_mode = !clutch_mode;
@@ -437,14 +438,14 @@ void Image::createTexture(uint tex_num)
 
 void App::updateOutputImage()
 {
-    Display cur_cam = cam_info.at(active_camera);
-    uint cam_size = cur_cam.image.size;
+    Display cur_disp = disp_info.at(active_display);
+    uint disp_size = cur_disp.image.size;
 
-    if (cam_size != out_img.size) {
+    if (disp_size != out_img.size) {
         // TODO: Figure out how to deal with different sizes
     }
 
-    out_img.data.assign(cur_cam.image.data.data(), cur_cam.image.data.data() + cur_cam.image.data.size());
+    out_img.data.assign(cur_disp.image.data.data(), cur_disp.image.data.data() + cur_disp.image.data.size());
     glActiveTexture(0);
     glBindTexture(GL_TEXTURE_2D, out_img.id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, out_img.width, out_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)out_img.data.data());
@@ -452,17 +453,17 @@ void App::updateOutputImage()
 
 void App::updatePipImage()
 {
-    Display cur_cam = cam_info.at(pip_camera);
-    uint cam_size = cur_cam.image.size;
+    Display cur_disp = disp_info.at(pip_display);
+    uint disp_size = cur_disp.image.size;
 
-    if (cam_size != out_img.size) {
+    if (disp_size != out_img.size) {
         // TODO: Figure out how to deal with different sizes
     }
 
-    cv::Mat flip_mat = cv::Mat(cur_cam.image.width, cur_cam.image.height, CV_8UC3, cur_cam.image.data.data());
+    cv::Mat flip_mat = cv::Mat(cur_disp.image.width, cur_disp.image.height, CV_8UC3, cur_disp.image.data.data());
     cv::flip(flip_mat, flip_mat, 0);
 
-    pip_img.resize(cur_cam.image.width, cur_cam.image.height, cur_cam.image.channels);
+    pip_img.resize(cur_disp.image.width, cur_disp.image.height, cur_disp.image.channels);
     pip_img.copy_data(flip_mat);
     glActiveTexture(2);
     glBindTexture(GL_TEXTURE_2D, pip_img.id);
@@ -521,17 +522,17 @@ void App::buildMenu(const char* title, void (App::*build_func)(void), ImGuiWindo
     ImGui::End();
 }
 
-void App::buildCameraSelectors()
+void App::buildDisplaySelectors()
 {
-    const char *cam_preview = cam_info.at(active_camera).name.c_str(); 
-    if (ImGui::BeginCombo("Main Camera", cam_preview, ImGuiComboFlags_None))
+    const char *disp_preview = disp_info.at(active_display).name.c_str(); 
+    if (ImGui::BeginCombo("Primary", disp_preview, ImGuiComboFlags_None))
     {
-        for (int n = 0; n < cam_info.size(); n++)
+        for (int n = 0; n < disp_info.size(); n++)
         {
-            const char *cam_name = cam_info.at(n).name.c_str();
-            const bool is_selected = (active_camera == n);
+            const char *cam_name = disp_info.at(n).name.c_str();
+            const bool is_selected = (active_display == n);
             if (ImGui::Selectable(cam_name, is_selected)) {
-                active_camera = n;
+                active_display = n;
             }
 
             // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
@@ -543,25 +544,25 @@ void App::buildCameraSelectors()
         ImGui::EndCombo();
     }
 
-    mismatchCameras(active_camera, pip_camera, cam_info.size());
+    mismatchDisplays(active_display, pip_display, disp_info.size());
 
-    if (cam_info.size() > 1) {
-        ImGui::Checkbox("PiP Enabled", &pip_enabled);
+    if (disp_info.size() > 1) {
+        ImGui::Checkbox("Pic-in-Pic Enabled", &pip_enabled);
         if (pip_enabled) {
-            const char *pip_preview = pip_preview = cam_info.at(pip_camera).name.c_str(); 
-            if (ImGui::BeginCombo("PiP Camera", pip_preview, ImGuiComboFlags_None))
+            const char *pip_preview = pip_preview = disp_info.at(pip_display).name.c_str(); 
+            if (ImGui::BeginCombo("Pic-in-Pic", pip_preview, ImGuiComboFlags_None))
             {
-                for (int n = 0; n < cam_info.size(); n++)
+                for (int n = 0; n < disp_info.size(); n++)
                 {
-                    // Skip currently active main camera
-                    if (active_camera == n) {
+                    // Skip currently active main display
+                    if (active_display == n) {
                         continue;
                     }
 
-                    const char *cam_name = cam_info.at(n).name.c_str();
-                    const bool is_selected = (pip_camera == n);
+                    const char *cam_name = disp_info.at(n).name.c_str();
+                    const bool is_selected = (pip_display == n);
                     if (ImGui::Selectable(cam_name, is_selected)) {
-                        pip_camera = n;
+                        pip_display = n;
                     }
 
                     // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
@@ -601,10 +602,10 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
 
     cv::Mat image = cur_img->image;
     int data_size = image.cols * image.rows * image.channels();
-    if (data_size > cam_info.at(index).image.size) {
-        cam_info.at(index).image.resize(image.cols, image.rows, image.channels());
+    if (data_size > disp_info.at(index).image.size) {
+        disp_info.at(index).image.resize(image.cols, image.rows, image.channels());
     }
-    cam_info.at(index).image.copy_data(image);
+    disp_info.at(index).image.copy_data(image);
 }
 
 
@@ -618,11 +619,11 @@ int App::run(int argc, char *argv[])
         return -1;
     }
 
-    // Set up camera textures
+    // Set up display textures
     MMesh img_surface = generateSquare();
     out_img.createTexture(0);
 
-    cv::Mat overlay_img = cv::imread("resources/textures/multicam_overlay.png");
+    cv::Mat overlay_img = cv::imread("resources/textures/clutch_mode_overlay.png");
     if (overlay_img.empty()) {
         printText("Could not load overlay image.");
         return -1;
@@ -644,15 +645,6 @@ int App::run(int argc, char *argv[])
     bg_shader.use();
     bg_shader.setInt("Texture", 0);
     bg_shader.setInt("Overlay", 1);
-
-    Shader backpack_shader((base_path + "backpack.vert").c_str(), (base_path + "backpack.frag").c_str());
-    // ----
-
-    // -- Model loading --
-    base_path = "resources/models/";
-
-    // Model backpack(base_path + "backpack/backpack.obj");
-    Model arrow(base_path + "arrow/arrow.obj");
     // ----
 
 
@@ -673,7 +665,7 @@ int App::run(int argc, char *argv[])
         ImGuiWindowFlags win_flags = 0;
         win_flags |= ImGuiWindowFlags_NoScrollbar;
         win_flags |= ImGuiWindowFlags_NoResize;
-        buildMenu("Camera Feeds", &App::buildCameraSelectors, win_flags);
+        buildMenu("Displays", &App::buildDisplaySelectors, win_flags);
 
         if (pip_enabled) {
             win_flags = 0;
@@ -683,9 +675,9 @@ int App::run(int argc, char *argv[])
             win_flags |= ImGuiWindowFlags_NoSavedSettings;
             ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
             ImGui::SetNextWindowPos(ImVec2(app_params.WINDOW_WIDTH - app_params.pip_width-120, app_params.WINDOW_HEIGHT - app_params.pip_height-100));
-            Display pip_cam = cam_info.at(pip_camera);
-            std::string cam_name = pip_cam.display_name;
-            buildMenu(cam_name.c_str(), &App::buildPiPWindow, win_flags);
+            Display pip_disp = disp_info.at(pip_display);
+            std::string disp_name = pip_disp.display_name;
+            buildMenu(disp_name.c_str(), &App::buildPiPWindow, win_flags);
         }
         // ---
 
@@ -703,24 +695,8 @@ int App::run(int argc, char *argv[])
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
-        backpack_shader.use();
-
-        // View/projection transformations
-        glm::mat4 projection = glm::perspective(glm::radians(scene_cam.Zoom), (float)app_params.WINDOW_WIDTH / (float)app_params.WINDOW_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = scene_cam.GetViewMatrix();
-        backpack_shader.setMat4("projection", projection);
-        backpack_shader.setMat4("view", view);
-
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
-        backpack_shader.setMat4("model", model);
-        arrow.Draw(backpack_shader);
-
-
-        // glBindVertexArray(img_surface.VAO);
-        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(img_surface.VAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
