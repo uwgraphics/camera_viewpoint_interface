@@ -36,9 +36,9 @@ namespace viewpoint_interface
     {
         uint loop_rate = 60;
 
-        // Starting window dimensions
-        uint const WINDOW_WIDTH = 1200;
-        uint const WINDOW_HEIGHT = 900;
+        // Starting window dimensions - 0 indicates fullscreen
+        uint const WINDOW_WIDTH = 0;
+        uint const WINDOW_HEIGHT = 0;
 
         uint pip_width = WINDOW_WIDTH * 0.25;
         uint pip_height = WINDOW_HEIGHT * 0.25;
@@ -75,7 +75,7 @@ namespace viewpoint_interface
             data = new_data;
         }
 
-        void createTexture(uint tex_num);
+        void generateEmptyTexture(uint tex_num);
 
         void resize(uint w, uint h, uint c)  
         {
@@ -219,6 +219,11 @@ namespace viewpoint_interface
     class App
     {
     public:
+        static const int FRAME_X = 0;
+        static const int FRAME_Y = 0;
+        static constexpr float WIDTH_FAC = 1.0f;
+        static constexpr float HEIGHT_FAC = 1.0f;
+
         App(AppParams params = AppParams()) : app_params(params)
         {
             pip_enabled = clutch_mode = false;
@@ -226,6 +231,8 @@ namespace viewpoint_interface
         }
 
         int run(int argc, char *argv[]);
+
+        static void transformFramebufferDims(int *x, int *y, int *width, int *height);
 
     private:
         // General items
@@ -244,6 +251,7 @@ namespace viewpoint_interface
 
         // GUI
         GLFWwindow* window;
+        GLFWmonitor *monitor;
         ImGuiIO io;
         Image out_img;
         Image pip_img;

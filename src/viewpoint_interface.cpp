@@ -249,7 +249,24 @@ bool App::initializeGlfw()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(app_params.WINDOW_WIDTH, app_params.WINDOW_HEIGHT, "Viewpoint Selection Interface", NULL, NULL);
+    monitor = glfwGetPrimaryMonitor();
+    if (!monitor) {
+        printText("Could not find primary monitor.");
+        return false;
+    }
+
+    uint win_width, win_height;
+    if (app_params.WINDOW_WIDTH == 0 || app_params.WINDOW_HEIGHT == 0) {
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        win_width = mode->width;
+        win_height = mode->height;
+    }
+    else {
+        win_width = app_params.WINDOW_WIDTH;
+        win_height = app_params.WINDOW_HEIGHT;
+    }
+
+    window = glfwCreateWindow(win_width, win_height, "Viewpoint Selection Interface", NULL, NULL);
     if (!window) {
         printText("Could not create window.");
         return false;
@@ -264,7 +281,10 @@ bool App::initializeGlfw()
     // Tells stb_image.h to flip loaded textures on y-axis
     stbi_set_flip_vertically_on_load(true);
 
-    glViewport(0, 0, app_params.WINDOW_WIDTH, app_params.WINDOW_HEIGHT);
+    int frame_width, frame_height, x, y;
+    glfwGetFramebufferSize(window, &frame_width, &frame_height);
+    transformFramebufferDims(&x, &y, &frame_width, &frame_height);
+    glViewport(0, 0, frame_width, frame_height);
     glEnable(GL_DEPTH_TEST);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
     
@@ -396,9 +416,19 @@ void glfwErrorCallback(int code, const char* description)
     printText(description);
 }
 
+void App::transformFramebufferDims(int *x, int *y, int *width, int *height)
+{
+    *x = FRAME_X;
+    *y = FRAME_Y;
+    *width = (int)(*width * WIDTH_FAC);
+    *height = (int)(*height * HEIGHT_FAC);
+}
+
 void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
-    glViewport(0, 0, width, height);
+    int x, y;
+    App::transformFramebufferDims(&x, &y, &width, &height);
+    glViewport(x, y, width, height);
 }
 
 void App::keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -425,7 +455,7 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
 
 
 // -- OpenGL and Dear ImGui --
-void Image::createTexture(uint tex_num)
+void Image::generateEmptyTexture(uint tex_num)
 {
     glGenTextures(1, &id);
     glActiveTexture(GL_TEXTURE0 + tex_num);
@@ -434,6 +464,7 @@ void Image::createTexture(uint tex_num)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glActiveTexture(GL_TEXTURE0);
 }
 
 void App::updateOutputImage()
@@ -619,32 +650,32 @@ int App::run(int argc, char *argv[])
         return -1;
     }
 
+    // TODO: 
+    // Create a pool with full set of displays (max 9)
+    // For now, choose 1024*1024*3 bytes
+    // Anytime that a display is activated, just start piping data
+    // to the appropriate display slot
+
     // Set up display textures
     MMesh img_surface = generateSquare();
-    out_img.createTexture(0);
+    out_img.generateEmptyTexture(1);
 
-    cv::Mat overlay_img = cv::imread("resources/textures/clutch_mode_overlay.png");
-    if (overlay_img.empty()) {
-        printText("Could not load overlay image.");
-        return -1;
-    }
-    cv::flip(overlay_img, overlay_img, 0);
-    Image overlay = Image(overlay_img.cols, overlay_img.rows, overlay_img.channels());
-    overlay.copy_data(overlay_img);
-    overlay.createTexture(1);
-    overlay_img.release();
-
+    uint overlay = TextureFromFile("clutch_mode_overlay.png", "resources/textures/");
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, overlay);
+    
     pip_img = Image();
-    pip_img.createTexture(2);
+    pip_img.generateEmptyTexture(3);
 
+    
 
     // -- Set up shaders --
     std::string base_path("resources/shaders/");
 
     Shader bg_shader((base_path + "bg_shader.vert").c_str(), (base_path + "bg_shader.frag").c_str());
     bg_shader.use();
-    bg_shader.setInt("Texture", 0);
-    bg_shader.setInt("Overlay", 1);
+    bg_shader.setInt("Texture", 1);
+    bg_shader.setInt("Overlay", 2);
     // ----
 
 
@@ -661,6 +692,8 @@ int App::run(int argc, char *argv[])
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+
+        // ImGui::ShowDemoWindow();
         
         ImGuiWindowFlags win_flags = 0;
         win_flags |= ImGuiWindowFlags_NoScrollbar;
@@ -682,9 +715,6 @@ int App::run(int argc, char *argv[])
         // ---
 
         updateOutputImage();
-        glActiveTexture(1);
-        glBindTexture(GL_TEXTURE_2D, overlay.id);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, overlay.width, overlay.height, 0, GL_BGR, GL_UNSIGNED_BYTE, (GLvoid*)overlay.data.data());
 
         if (pip_enabled) {
             updatePipImage();
