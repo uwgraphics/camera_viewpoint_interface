@@ -159,11 +159,11 @@ bool App::parseCameraFile()
     uint num_cams = j["_num_cams"];
     for (uint i = 0; i < num_cams; i++) {
         std::string cam_id = "cam" + std::to_string(i);
-        std::string name, topic_name, display_name;
+        std::string int_name, ext_name, topic_name;
         uint w, h, c;
 
-        name = j[cam_id]["name"];
-        display_name = j[cam_id]["display_name"];
+        int_name = j[cam_id]["internal_name"];
+        ext_name = j[cam_id]["external_name"];
         topic_name = j[cam_id]["topic"];
         w = j[cam_id]["width"];
         h = j[cam_id]["height"];
@@ -179,7 +179,9 @@ bool App::parseCameraFile()
             max_channels = c;
         }
 
-        disp_info.insert(std::pair<uint, Display>(i, Display(name, topic_name, display_name, w, h, c)));
+        displays.addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
+
+        disp_info.insert(std::pair<uint, DDisplay>(i, DDisplay(int_name, topic_name, ext_name, w, h, c)));
     }
 
     out_img = Image(max_width, max_height, max_channels);
@@ -228,11 +230,11 @@ bool App::initializeSocket()
 
 void App::initializeROS(int argc, char *argv[])
 {
-    ros::init(argc, argv, "ros_openvr");
+    ros::init(argc, argv, "viewpoint_interface");
     ros::NodeHandle n;
     
-    for (int i = 0; i < disp_info.size(); i++) {
-        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(disp_info[i].topic_name, 10, boost::bind(&App::cameraImageCallback, this, _1, i)));
+    for (int i = 0; i < displays.size(); i++) {
+        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(displays[i].getTopicName(), 10, boost::bind(&App::cameraImageCallback, this, _1, i)));
         cam_subs.push_back(cam_sub);
     }
 }
@@ -469,7 +471,7 @@ void Image::generateEmptyTexture(uint tex_num)
 
 void App::updateOutputImage()
 {
-    Display cur_disp = disp_info.at(active_display);
+    DDisplay cur_disp = disp_info.at(active_display);
     uint disp_size = cur_disp.image.size;
 
     if (disp_size != out_img.size) {
@@ -484,7 +486,7 @@ void App::updateOutputImage()
 
 void App::updatePipImage()
 {
-    Display cur_disp = disp_info.at(pip_display);
+    DDisplay cur_disp = disp_info.at(pip_display);
     uint disp_size = cur_disp.image.size;
 
     if (disp_size != out_img.size) {
@@ -547,10 +549,45 @@ void App::buildMenu(const char* title, void (App::*build_func)(void), ImGuiWindo
 {
 
     ImGui::Begin(title, (bool *)NULL, window_flags);
-    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.6f);
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.35f);
     (this->*build_func)();
     ImGui::PopItemWidth();
     ImGui::End();
+}
+
+void App::buildLayoutsMenu()
+{
+    if (ImGui::BeginMenuBar())
+    {
+        std::shared_ptr<Layout> active_layout = layouts.getActiveLayout();
+        
+        if (ImGui::BeginMenu(active_layout->getLayoutName().c_str())) {
+            std::vector<std::string> layout_names = layouts.getLayoutList();
+            bool selected;
+            bool inactivate = false;
+
+            selected = layouts.isLayoutActive(LayoutType::NONE);
+            ImGui::MenuItem("Inactivate", NULL, &selected);
+            if (selected)
+            {
+                layouts.activateLayout(LayoutType::NONE);
+            }
+
+            for (int i = 0; i < layout_names.size(); i++) {
+                LayoutType layout_type = layouts.intToLayoutType(i);
+                selected = layouts.isLayoutActive(layout_type);
+                ImGui::MenuItem(layout_names[i].c_str(), NULL, &selected);
+
+                if (selected) {
+                    layouts.activateLayout(layout_type);
+                }
+            }
+
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMenuBar();
+    }
 }
 
 void App::buildDisplaySelectors()
@@ -667,8 +704,6 @@ int App::run(int argc, char *argv[])
     pip_img = Image();
     pip_img.generateEmptyTexture(3);
 
-    
-
     // -- Set up shaders --
     std::string base_path("resources/shaders/");
 
@@ -693,12 +728,22 @@ int App::run(int argc, char *argv[])
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow();
         
         ImGuiWindowFlags win_flags = 0;
         win_flags |= ImGuiWindowFlags_NoScrollbar;
         win_flags |= ImGuiWindowFlags_NoResize;
         buildMenu("Displays", &App::buildDisplaySelectors, win_flags);
+
+        win_flags = 0;
+        win_flags |= ImGuiWindowFlags_NoScrollbar;
+        win_flags |= ImGuiWindowFlags_NoResize;
+        win_flags |= ImGuiWindowFlags_MenuBar;
+        ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, main_viewport->GetWorkPos().y + 50), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(150, 180), ImGuiCond_Always);
+        buildMenu("Layouts", &App::buildLayoutsMenu, win_flags);
+
 
         if (pip_enabled) {
             win_flags = 0;
@@ -708,7 +753,7 @@ int App::run(int argc, char *argv[])
             win_flags |= ImGuiWindowFlags_NoSavedSettings;
             ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
             ImGui::SetNextWindowPos(ImVec2(app_params.WINDOW_WIDTH - app_params.pip_width-120, app_params.WINDOW_HEIGHT - app_params.pip_height-100));
-            Display pip_disp = disp_info.at(pip_display);
+            DDisplay pip_disp = disp_info.at(pip_display);
             std::string disp_name = pip_disp.display_name;
             buildMenu(disp_name.c_str(), &App::buildPiPWindow, win_flags);
         }

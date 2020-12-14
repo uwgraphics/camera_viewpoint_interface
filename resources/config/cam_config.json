@@ -1,25 +1,25 @@
 {
     "_num_cams": 3,
     "cam0": {
-        "name": "dynamic",
+        "internal_name": "dynamic",
+        "external_name": "Dynamic Camera",
         "topic": "/cam/dyn_image",
-        "display_name": "Dynamic Camera",
         "width": 1024,
         "height": 1024,
         "channels": 3
     },
     "cam1": {
-        "name": "static",
+        "internal_name": "static",
+        "external_name": "Static Camera",
         "topic": "/cam/stat_image",
-        "display_name": "Static Camera",
         "width": 1024,
         "height": 1024,
         "channels": 3
     },
     "cam2": {
-        "name": "wide",
+        "internal_name": "wide",
+        "external_name": "Wide Camera",
         "topic": "/cam/wide_image",
-        "display_name": "Wide Camera",
         "width": 1024,
         "height": 1024,
         "channels": 3

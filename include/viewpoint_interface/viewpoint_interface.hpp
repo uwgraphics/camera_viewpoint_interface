@@ -18,6 +18,7 @@
 #include "viewpoint_interface/shader.hpp"
 #include "viewpoint_interface/switch.hpp"
 #include "viewpoint_interface/layout.hpp"
+#include "viewpoint_interface/display.hpp"
 #include "viewpoint_interface/scene_camera.hpp"
 
 
@@ -88,13 +89,13 @@ namespace viewpoint_interface
         }
     };
 
-    struct Display
+    struct DDisplay
     {
         std::string name, topic_name, display_name;
         Image image;
 
-        Display() : name(""), topic_name(""), display_name("") {}
-        Display(std::string n, std::string t, std::string d, uint w, uint h, uint c) : name(n), topic_name(t), 
+        DDisplay() : name(""), topic_name(""), display_name("") {}
+        DDisplay(std::string n, std::string t, std::string d, uint w, uint h, uint c) : name(n), topic_name(t), 
                 display_name(d), image(Image(w, h, c)) {}
     };
 
@@ -143,8 +144,7 @@ namespace viewpoint_interface
         static constexpr float WIDTH_FAC = 1.0f;
         static constexpr float HEIGHT_FAC = 1.0f;
 
-        App(AppParams params = AppParams()) : app_params(params), 
-                active_layout(NoneLayout())
+        App(AppParams params = AppParams()) : app_params(params)
         {
             pip_enabled = clutch_mode = false;
             active_display = pip_display = 0;
@@ -159,8 +159,9 @@ namespace viewpoint_interface
         AppParams app_params;
         Input input;
         Socket sock;
-        Layout active_layout;
-        std::map<uint, Display> disp_info;
+        DisplayManager displays;
+        LayoutManager layouts;
+        std::map<uint, DDisplay> disp_info;
         uint active_display;
         bool pip_enabled; // pip = Picture-in-picture
         uint pip_tex;
@@ -199,6 +200,7 @@ namespace viewpoint_interface
         
         // Dear ImGui
         void buildMenu(const char *title, void (App::*build_func)(void), ImGuiWindowFlags window_flags = 0);
+        void buildLayoutsMenu();
         void buildDisplaySelectors();
         void buildPiPWindow();
     };
