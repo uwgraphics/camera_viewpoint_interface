@@ -2,26 +2,24 @@
 #define __LAYOUT_HPP__
 
 #include <string>
+#include <algorithm>
+
+#include <imgui/imgui.h>
+#include "display.hpp"
 
 namespace viewpoint_interface
 {
-
     class LayoutManager;
 
     enum LayoutType
     {
         NONE = -1,
-        MOVIE,
+        STACK,
         GRID,
-        SPLIT,
-        TWINNED,
         PIP,
         CAROUSEL
     };
     
-    // TODO: Consider adding a layout manager to cache parameters for
-    // layouts that have been activated previously in this session
-
     class Layout
     {
     public:
@@ -41,14 +39,42 @@ namespace viewpoint_interface
             return layout_names[(uint)layout_type];
         }
 
+        virtual void displayLayoutParams() const = 0;
 
     protected:
-        Layout(LayoutType type) : layout_type(type) {}
+        DisplayManager &displays;
+
+        Layout(LayoutType type, DisplayManager &disp) : layout_type(type), displays(disp) {}
+
+        virtual void drawDisplaysList() const
+        {
+            const int max_items = 5; // Max number of displays to list w/o scrolling
+
+            int total_displays = displays.size();
+            if (total_displays > 1) {
+
+                int opt_shown = total_displays > max_items ? max_items : total_displays;
+                if (ImGui::ListBoxHeader("Available\nDisplays", total_displays, opt_shown)) {
+                    for (int i = 0; i < total_displays; i++) {
+                        bool active = displays[i].isActive();
+
+                        if (ImGui::Selectable(displays[i].getInternalName().c_str(), active)) {
+                            // TODO: Shouldn't be able to turn off all the displays
+                            
+                            displays[i].flipState();
+                        }
+                    }
+                }
+
+                ImGui::ListBoxFooter();
+            }
+
+            ImGui::Separator();
+        }
 
     private:
         const std::vector<std::string> layout_names = {
-            "Movie", "Grid", "Split Screen", "Twinned",
-            "Picture-in-Picture", "Carousel"
+            "Stack", "Grid", "Picture-in-Picture", "Carousel"
         };
 
         LayoutType layout_type;
@@ -58,50 +84,102 @@ namespace viewpoint_interface
     class NoneLayout : public Layout
     {
     public:
-        NoneLayout() : Layout(LayoutType::NONE) {}
+        NoneLayout(DisplayManager &displays) : Layout(LayoutType::NONE, displays) {}
+
+        virtual void displayLayoutParams() const override
+        {
+            ImGui::Text("No layouts selected:");
+            ImGui::BulletText("Please select a layout from the menu\n"
+                            "at the top of the window.");
+        }
+
     };
 
-    class MovieLayout : public Layout
+
+    struct StackParams
+    {
+        uint start_num_displays = 3;
+        uint max_displays = DisplayManager::max_buffers;
+
+    };
+
+    class StackLayout : public Layout
     {
     public:
-        MovieLayout() : Layout(LayoutType::MOVIE) {}
+
+        StackLayout(DisplayManager &displays, StackParams params=StackParams()) : Layout(LayoutType::STACK, displays), 
+                parameters(params) 
+        {
+            if (parameters.start_num_displays > parameters.max_displays) {
+                parameters.start_num_displays = parameters.max_displays;
+            }
+            else if (parameters.start_num_displays == 0) {
+                parameters.start_num_displays = 1;
+            }
+        }
+
+        virtual void displayLayoutParams() const override
+        {
+            static uint num_displays = parameters.start_num_displays;
+
+            drawDisplaysList(); // Add min and max number of displays that can be active
+            // If max is one, just use standard ListBox
+
+            ImGui::SliderInt("# Displays", (int *) &num_displays, 1, parameters.max_displays);
+
+            // TODO:
+            // List all active displays in a ListBox and allow dragging and dropping to
+            // rearrange the display ring
+            // <algorithm> std::iter_swap
+        }
+
+    private:
+        StackParams parameters;
     };
 
     class GridLayout : public Layout
     {
     public:
-        GridLayout() : Layout(LayoutType::GRID) {}
-    };
+        GridLayout(DisplayManager &displays) : Layout(LayoutType::GRID, displays) {}
 
-    class SplitLayout : public Layout
-    {
-    public:
-        SplitLayout() : Layout(LayoutType::SPLIT) {}
-    };
+        virtual void displayLayoutParams() const override
+        {
 
-    class TwinnedLayout : public Layout
-    {
-    public:
-        TwinnedLayout() : Layout(LayoutType::TWINNED) {}
+        }
+
     };
 
     class PipLayout : public Layout
     {
     public:
-        PipLayout() : Layout(LayoutType::PIP) {}
+        PipLayout(DisplayManager &displays) : Layout(LayoutType::PIP, displays) {}
+
+        virtual void displayLayoutParams() const override
+        {
+
+        }
+
     };
 
     class CarouselLayout : public Layout
     {
     public:
-        CarouselLayout() : Layout(LayoutType::CAROUSEL) {}
+        CarouselLayout(DisplayManager &displays) : Layout(LayoutType::CAROUSEL, displays) {}
+
+        virtual void displayLayoutParams() const override
+        {
+
+        }
+
     };
 
 
     class LayoutManager
     {
     public:
-        LayoutManager() : active_layout(new NoneLayout()) {}
+        const std::string window_title = "Layouts Control Panel";
+
+        LayoutManager() : active_layout(new NoneLayout(displays)) {}
 
         static LayoutType intToLayoutType(int ix) {
             if (ix >= 0 && ix < num_layout_types) {
@@ -121,13 +199,14 @@ namespace viewpoint_interface
             return active_layout;
         }
 
-        bool isLayoutActive(LayoutType type) const
+        void addDisplay(const Display &disp)
         {
-            if (active_layout->getLayoutType() == type) {
-                return true;
-            }
+            displays.addDisplay(disp);
+        }
 
-            return false;
+        const DisplayManager &getDisplays() const
+        {
+            return displays;
         }
 
         void activateLayout(LayoutType type)
@@ -138,6 +217,8 @@ namespace viewpoint_interface
             }
 
             // We cache previously active layouts so that their params are not reset
+            // This also allows us to initialize all the layouts with custom params
+            // at the start of the program
             if (!isInCache(active_layout->getLayoutType())) {
                 layouts_cache.push_back(active_layout);
             }
@@ -150,49 +231,68 @@ namespace viewpoint_interface
             }
         }
 
+        bool isLayoutActive(LayoutType type) const
+        {
+            if (active_layout->getLayoutType() == type) {
+                return true;
+            }
+
+            return false;
+        }
+
+        void excludeLayout(LayoutType type)
+        {
+            if (!isLayoutExcluded(type)) {
+                excluded_layouts.push_back(type);
+            }
+        }
+
+        bool isLayoutExcluded(LayoutType type) const
+        {
+            const std::vector<LayoutType> &vec = excluded_layouts;
+            if (std::find(vec.begin(), vec.end(), type) != vec.end()) {
+                return true;
+            }
+
+            return false;
+        }
+
     private:
-        static const uint num_layout_types = 6;
+        static const uint num_layout_types = 4;
+
+        std::shared_ptr<Layout> active_layout;
+        DisplayManager displays;
 
         std::vector<std::shared_ptr<Layout>> layouts_cache;
-        std::shared_ptr<Layout> active_layout;
+        std::vector<LayoutType> excluded_layouts;
 
         std::shared_ptr<Layout> newLayout(LayoutType type)
         {
             std::shared_ptr<Layout> layout;
             switch(type) {
-                case LayoutType::MOVIE:
+                case LayoutType::STACK:
                 {
-                    layout = std::shared_ptr<Layout>(new MovieLayout());
+                    layout = std::shared_ptr<Layout>(new StackLayout(displays));
                 } break;
 
                 case LayoutType::GRID:
                 {
-                    layout = std::shared_ptr<Layout>(new GridLayout());
-                } break;
-
-                case LayoutType::SPLIT:
-                {
-                    layout = std::shared_ptr<Layout>(new SplitLayout());
-                } break;
-
-                case LayoutType::TWINNED:
-                {
-                    layout = std::shared_ptr<Layout>(new TwinnedLayout());
+                    layout = std::shared_ptr<Layout>(new GridLayout(displays));
                 } break;
 
                 case LayoutType::PIP:
                 {
-                    layout = std::shared_ptr<Layout>(new PipLayout());
+                    layout = std::shared_ptr<Layout>(new PipLayout(displays));
                 } break;
 
                 case LayoutType::CAROUSEL:
                 {
-                    layout = std::shared_ptr<Layout>(new CarouselLayout());
+                    layout = std::shared_ptr<Layout>(new CarouselLayout(displays));
                 } break;
 
                 default: 
                 {
-                    layout = std::shared_ptr<Layout>(new NoneLayout());
+                    layout = std::shared_ptr<Layout>(new NoneLayout(displays));
                 } break;
             }
             
@@ -212,13 +312,21 @@ namespace viewpoint_interface
 
         std::shared_ptr<Layout> getLayoutFromCache(LayoutType type) const
         {
+            // LayoutManager is initialized with a NoneLayout, so it should always
+            // should be the first layout in the cache
+            std::shared_ptr<Layout> none_layout(layouts_cache[0]);
+
+            if (type == LayoutType::NONE) {
+                return none_layout;
+            }
+
             for (const std::shared_ptr<Layout> layout : layouts_cache) {
                 if (layout->getLayoutType() == type) {
                     return layout;
                 }
             }
 
-            return std::shared_ptr<Layout>(new NoneLayout());
+            return none_layout;
         }
     };
 
