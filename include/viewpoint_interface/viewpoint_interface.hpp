@@ -144,7 +144,7 @@ namespace viewpoint_interface
         static constexpr float WIDTH_FAC = 1.0f;
         static constexpr float HEIGHT_FAC = 1.0f;
 
-        App(AppParams params = AppParams()) : app_params(params)
+        App(AppParams params=AppParams()) : app_params(params)
         {
             pip_enabled = clutch_mode = false;
             active_display = pip_display = 0;
@@ -159,7 +159,6 @@ namespace viewpoint_interface
         AppParams app_params;
         Input input;
         Socket sock;
-        DisplayManager displays;
         LayoutManager layouts;
         std::map<uint, DDisplay> disp_info;
         uint active_display;
@@ -199,7 +198,7 @@ namespace viewpoint_interface
         void updatePipImage();
         
         // Dear ImGui
-        void buildMenu(const char *title, void (App::*build_func)(void), ImGuiWindowFlags window_flags = 0);
+        void buildMenu(std::string title, void (App::*build_func)(void), ImGuiWindowFlags window_flags = 0);
         void buildLayoutsMenu();
         void buildDisplaySelectors();
         void buildPiPWindow();

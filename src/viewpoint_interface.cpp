@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
 {   
     App app = App();
     app.run(argc, argv);
+    
     return 0;
 }
 
@@ -179,7 +180,7 @@ bool App::parseCameraFile()
             max_channels = c;
         }
 
-        displays.addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
+        layouts.addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
 
         disp_info.insert(std::pair<uint, DDisplay>(i, DDisplay(int_name, topic_name, ext_name, w, h, c)));
     }
@@ -232,6 +233,8 @@ void App::initializeROS(int argc, char *argv[])
 {
     ros::init(argc, argv, "viewpoint_interface");
     ros::NodeHandle n;
+
+    DisplayManager displays(layouts.getDisplays());
     
     for (int i = 0; i < displays.size(); i++) {
         ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(displays[i].getTopicName(), 10, boost::bind(&App::cameraImageCallback, this, _1, i)));
@@ -545,10 +548,10 @@ MMesh generateSquare()
     return mesh;
 }
 
-void App::buildMenu(const char* title, void (App::*build_func)(void), ImGuiWindowFlags window_flags)
+void App::buildMenu(std::string title, void (App::*build_func)(void), ImGuiWindowFlags window_flags)
 {
 
-    ImGui::Begin(title, (bool *)NULL, window_flags);
+    ImGui::Begin(title.c_str(), (bool *)NULL, window_flags);
     ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.35f);
     (this->*build_func)();
     ImGui::PopItemWidth();
@@ -557,10 +560,10 @@ void App::buildMenu(const char* title, void (App::*build_func)(void), ImGuiWindo
 
 void App::buildLayoutsMenu()
 {
+    std::shared_ptr<Layout> active_layout = layouts.getActiveLayout();
+
     if (ImGui::BeginMenuBar())
     {
-        std::shared_ptr<Layout> active_layout = layouts.getActiveLayout();
-        
         if (ImGui::BeginMenu(active_layout->getLayoutName().c_str())) {
             std::vector<std::string> layout_names = layouts.getLayoutList();
             bool selected;
@@ -575,6 +578,11 @@ void App::buildLayoutsMenu()
 
             for (int i = 0; i < layout_names.size(); i++) {
                 LayoutType layout_type = layouts.intToLayoutType(i);
+                
+                if (layouts.isLayoutExcluded(layout_type)) {
+                    continue;
+                }
+
                 selected = layouts.isLayoutActive(layout_type);
                 ImGui::MenuItem(layout_names[i].c_str(), NULL, &selected);
 
@@ -588,6 +596,12 @@ void App::buildLayoutsMenu()
 
         ImGui::EndMenuBar();
     }
+
+    ImGui::Text("Parameters for %s:", active_layout->getLayoutName().c_str());
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    active_layout->displayLayoutParams();
 }
 
 void App::buildDisplaySelectors()
@@ -741,8 +755,8 @@ int App::run(int argc, char *argv[])
         win_flags |= ImGuiWindowFlags_MenuBar;
         ImGuiViewport* main_viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, main_viewport->GetWorkPos().y + 50), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(150, 180), ImGuiCond_Always);
-        buildMenu("Layouts", &App::buildLayoutsMenu, win_flags);
+        ImGui::SetNextWindowSize(ImVec2(200, 250), ImGuiCond_Always);
+        buildMenu(layouts.window_title, &App::buildLayoutsMenu, win_flags);
 
 
         if (pip_enabled) {
