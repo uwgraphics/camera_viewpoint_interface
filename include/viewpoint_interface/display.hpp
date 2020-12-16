@@ -6,6 +6,7 @@
 
 namespace viewpoint_interface
 {
+    class DisplayManager;
 
     struct DisplayDims
     {
@@ -47,15 +48,22 @@ namespace viewpoint_interface
 
         const DisplayDims& dims() const { return dimensions; }
 
-        bool isActive() const { return active; }
-        void activate() { active = true; }
-        void deactivate() { active = false; }
-        void flipState() { active = !active; }
-
     private:
         std::string int_name, ext_name, topic_name;
         DisplayDims dimensions;
         bool active;
+
+        bool isActive() const { return active; }
+        void activate() { active = true; }
+        void deactivate() { active = false; }
+        bool flipState() 
+        { 
+            bool new_state = !active;
+            active = new_state; 
+            return new_state;
+        }
+
+        friend class DisplayManager;
     };
 
 
@@ -87,6 +95,39 @@ namespace viewpoint_interface
         void addDisplay(const Display &disp)
         {
             displays.push_back(disp);
+            num_active_displays++;
+        }
+
+        bool isActive(uint ix) const { return displays[ix].isActive(); }
+        void activate(uint ix) { displays[ix].activate(); num_active_displays++; }
+        void deactivate(uint ix) { displays[ix].deactivate(); num_active_displays--; }
+        void flipState(uint ix) 
+        {
+            if (displays[ix].flipState()) {
+                num_active_displays++;
+            }
+            else {
+                num_active_displays--;
+            }
+        }
+        uint getNumActiveDisplays() const { return num_active_displays; }
+
+        uint getPrimaryDisplayIx() const { return primary_display; }
+        void setPrimaryDisplayIx(uint ix) { primary_display = ix; }
+        const Display &getPrimaryDisplay() const { return displays.at(primary_display); }
+        ImVec4 getPrimaryColor() const { return primary_color; }
+
+        void swapDisplays(uint ix1, uint ix2)
+        {
+            if (ix1 == primary_display) {
+                primary_display = ix2;
+            }
+            else if (ix2 == primary_display) {
+                primary_display = ix1;
+            }
+
+            std::vector<Display> &vec(displays);
+            std::iter_swap(vec.begin() + ix1, vec.begin() + ix2);
         }
 
         void bufferDisplay()
@@ -95,6 +136,9 @@ namespace viewpoint_interface
         }
 
     private:
+        uint primary_display = 0;
+        const ImVec4 primary_color{10.0/255, 190.0/255, 10.0/255, 255.0/255};
+        uint num_active_displays = 0;
         std::vector<Display> displays;
         std::vector<uint> active_buffers;
         std::vector<std::vector<uint>> buffers;

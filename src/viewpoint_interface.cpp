@@ -308,11 +308,12 @@ void App::initializeImGui()
     ImGui::StyleColorsDark();
 
     ImGuiStyle& style = ImGui::GetStyle();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        style.WindowRounding = 0.0f;
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
+    style.ItemInnerSpacing = ImVec2(7.0, 2.0);
+    style.WindowRounding = 6.0;
+    // if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    //     style.WindowRounding = 0.0f;
+    //     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    // }
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -551,7 +552,11 @@ MMesh generateSquare()
 void App::buildMenu(std::string title, void (App::*build_func)(void), ImGuiWindowFlags window_flags)
 {
 
-    ImGui::Begin(title.c_str(), (bool *)NULL, window_flags);
+    if (!ImGui::Begin(title.c_str(), (bool *)NULL, window_flags)) {
+        ImGui::End();
+        return;    
+    }
+
     ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.35f);
     (this->*build_func)();
     ImGui::PopItemWidth();
@@ -753,9 +758,10 @@ int App::run(int argc, char *argv[])
         win_flags |= ImGuiWindowFlags_NoScrollbar;
         win_flags |= ImGuiWindowFlags_NoResize;
         win_flags |= ImGuiWindowFlags_MenuBar;
+        win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
         ImGuiViewport* main_viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, main_viewport->GetWorkPos().y + 50), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(200, 250), ImGuiCond_Always);
+        // ImGui::SetNextWindowSize(ImVec2(200, 250), ImGuiCond_Always);
         buildMenu(layouts.window_title, &App::buildLayoutsMenu, win_flags);
 
 
