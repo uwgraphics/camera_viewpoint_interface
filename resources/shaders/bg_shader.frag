@@ -15,7 +15,7 @@ void main()
 	vec4 main_tex = texture(Texture, TexCoord);
     vec4 over_tex = texture(Overlay, TexCoord);
     float overlay_factor = 0.9;
-    // FragColor = over_tex;
+    FragColor = over_tex;
     if (overlay_on) {
         FragColor = (main_tex / 1.5) + (over_tex / 1.5);
     }

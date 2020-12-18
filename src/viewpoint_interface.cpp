@@ -4,6 +4,9 @@
 #include <sys/socket.h>
 #include <poll.h>
 #include <netinet/in.h>
+#include <thread>
+
+#include <chrono> // TEST
 
 // ROS
 #include <sensor_msgs/Image.h>
@@ -78,62 +81,68 @@ void printText(std::string text, int newlines, bool flush)
     return;
 }
 
-uint getNextIndex(uint ix, uint size)
+
+// TEST
+auto start = std::chrono::high_resolution_clock::now();
+void startTiming()
 {
-    return (ix + 1) % size;
+    start = std::chrono::high_resolution_clock::now();
 }
 
-uint getPreviousIndex(uint ix, uint size)
+void stopTiming()
 {
-    return (ix == 0) ? (size - 1) : (ix - 1);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "Time: " << duration.count() << std::endl;
 }
 
-void mismatchDisplays(uint &disp1, uint &disp2, uint size)
-{
-    if (disp1 == disp2) {
-        disp2 = getNextIndex(disp2, size);
-    }
-}
 
-void nextDisplay(uint &disp1, uint &disp2, uint size, bool bump)
-{
-    if (size < 2) {
-        disp1 = disp2 = 0;
-    }
+// void mismatchDisplays(uint &disp1, uint &disp2, uint size)
+// {
+//     if (disp1 == disp2) {
+//         disp2 = getNextIndex(disp2, size);
+//     }
+// }
 
-    if (bump) {
-        disp1 = getNextIndex(disp1, size);
-        mismatchDisplays(disp1, disp2, size);
-    }
-    else {
-        uint next_disp = getNextIndex(disp1, size);
-        if (next_disp == disp2) {
-            next_disp = getNextIndex(next_disp, size);
-        }
+// void nextDisplay(uint &disp1, uint &disp2, uint size, bool bump)
+// {
+//     if (size < 2) {
+//         disp1 = disp2 = 0;
+//     }
+//
+//     if (bump) {
+//         disp1 = getNextIndex(disp1, size);
+//         mismatchDisplays(disp1, disp2, size);
+//     }
+//     else {
+//         uint next_disp = getNextIndex(disp1, size);
+//         if (next_disp == disp2) {
+//             next_disp = getNextIndex(next_disp, size);
+//         }
+//
+//         disp1 = next_disp;
+//     }
+// }
 
-        disp1 = next_disp;
-    }
-}
-
-void previousDisplay(uint &disp1, uint &disp2, uint size, bool bump)
-{
-    if (size < 2) {
-        disp1 = disp2 = 0;
-    }
-
-    if (bump) {
-        disp1 = getPreviousIndex(disp1, size);
-        mismatchDisplays(disp1, disp2, size);
-    }
-    else {
-        uint next_disp = getPreviousIndex(disp1, size);
-        if (next_disp == disp2) {
-            next_disp = getPreviousIndex(next_disp, size);
-        }
-
-        disp1 = next_disp;
-    }
-}
+// void previousDisplay(uint &disp1, uint &disp2, uint size, bool bump)
+// {
+//     if (size < 2) {
+//         disp1 = disp2 = 0;
+//     }
+//
+//     if (bump) {
+//         disp1 = getPreviousIndex(disp1, size);
+//         mismatchDisplays(disp1, disp2, size);
+//     }
+//     else {
+//         uint next_disp = getPreviousIndex(disp1, size);
+//         if (next_disp == disp2) {
+//             next_disp = getPreviousIndex(next_disp, size);
+//         }
+//
+//         disp1 = next_disp;
+//     }
+// }
 
 bool App::parseCameraFile()
 {
@@ -180,9 +189,7 @@ bool App::parseCameraFile()
             max_channels = c;
         }
 
-        layouts.addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
-
-        disp_info.insert(std::pair<uint, DDisplay>(i, DDisplay(int_name, topic_name, ext_name, w, h, c)));
+        layouts.getDisplays().addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
     }
 
     out_img = Image(max_width, max_height, max_channels);
@@ -237,7 +244,8 @@ void App::initializeROS(int argc, char *argv[])
     DisplayManager displays(layouts.getDisplays());
     
     for (int i = 0; i < displays.size(); i++) {
-        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(displays[i].getTopicName(), 10, boost::bind(&App::cameraImageCallback, this, _1, i)));
+        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(displays[i].getTopicName(), 10, 
+                boost::bind(&App::cameraImageCallback, this, _1, i)));
         cam_subs.push_back(cam_sub);
     }
 }
@@ -346,73 +354,73 @@ std::string getSocketData(Socket &sock)
 }
 
 // TODO: Change all robot control code
-void App::parseControllerInput(std::string data)
-{
-    std::string CONTR_NAME = app_params.CONTR_NAME;
-
-    json j = json::parse(data);
-
-    input.clutching = j[CONTR_NAME]["clutch"]["boolean"];
-
-    input.manual_adj = j[CONTR_NAME]["manual_adj"]["boolean"];
-    input.manual_offset.x = j[CONTR_NAME]["manual_adj"]["2d"]["x"];
-    input.manual_offset.z = j[CONTR_NAME]["manual_adj"]["2d"]["y"];
-
-    if (!input.initialized) {
-    }
-
-    // Handle clutching enabled by keyboard
-    if (clutch_mode && !input.clutching.is_flipping() && !input.clutching.is_on()) {
-        input.clutching.turn_on();
-    }
-
-    if (input.clutching.is_flipping()) {
-        if (input.clutching.is_on()) { // When just turned on
-            clutch_mode = true;
-            // TODO: Add orientation handling
-        }
-        else {
-            clutch_mode = false;
-        }
-    }
-
-    if (input.manual_adj.confirm_flip_on()) {
-        if (input.manual_offset.x >= 0.5) {
-            nextDisplay(active_display, pip_display, disp_info.size());
-        }
-        else if (input.manual_offset.x <= -0.5) {
-            previousDisplay(active_display, pip_display, disp_info.size());
-        }
-        else if (input.manual_offset.z >= 0.5) {
-            nextDisplay(pip_display, active_display, disp_info.size(), false);
-        }
-        else if (input.manual_offset.z <= -0.5) {
-            previousDisplay(pip_display, active_display, disp_info.size(), false);
-        }
-        else {
-            pip_enabled = !pip_enabled;
-        }
-    }
-}
+// void App::parseControllerInput(std::string data)
+// {
+//     std::string CONTR_NAME = app_params.CONTR_NAME;
+//
+//     json j = json::parse(data);
+//
+//     input.clutching = j[CONTR_NAME]["clutch"]["boolean"];
+//
+//     input.manual_adj = j[CONTR_NAME]["manual_adj"]["boolean"];
+//     input.manual_offset.x = j[CONTR_NAME]["manual_adj"]["2d"]["x"];
+//     input.manual_offset.z = j[CONTR_NAME]["manual_adj"]["2d"]["y"];
+//
+//     if (!input.initialized) {
+//     }
+//
+//     // Handle clutching enabled by keyboard
+//     if (clutch_mode && !input.clutching.is_flipping() && !input.clutching.is_on()) {
+//         input.clutching.turn_on();
+//     }
+//
+//     if (input.clutching.is_flipping()) {
+//         if (input.clutching.is_on()) { // When just turned on
+//             clutch_mode = true;
+//             // TODO: Add orientation handling
+//         }
+//         else {
+//             clutch_mode = false;
+//         }
+//     }
+//
+//     if (input.manual_adj.confirm_flip_on()) {
+//         if (input.manual_offset.x >= 0.5) {
+//             nextDisplay(active_display, pip_display, disp_info.size());
+//         }
+//         else if (input.manual_offset.x <= -0.5) {
+//             previousDisplay(active_display, pip_display, disp_info.size());
+//         }
+//         else if (input.manual_offset.z >= 0.5) {
+//             nextDisplay(pip_display, active_display, disp_info.size(), false);
+//         }
+//         else if (input.manual_offset.z <= -0.5) {
+//             previousDisplay(pip_display, active_display, disp_info.size(), false);
+//         }
+//         else {
+//             pip_enabled = !pip_enabled;
+//         }
+//     }
+// }
 
 // TODO: No longer robot control--only handles controller input
-void App::handleRobotControl()
-{
-    pollfd poll_fds;
-    poll_fds.fd = sock.sock;
-    poll_fds.events = POLLIN; // Wait until there's data to read
-
-    while (ros::ok() && !glfwWindowShouldClose(window))
-    {
-        if (poll(&poll_fds, 1, app_params.loop_rate) > 0) {
-            std::string input_data = getSocketData(sock);
-            parseControllerInput(input_data);
-            printText(input.to_str(true));        
-        }
-    }
-
-    shutdown(sock.sock, SHUT_RDWR);
-}
+// void App::handleRobotControl()
+// {
+//     pollfd poll_fds;
+//     poll_fds.fd = sock.sock;
+//     poll_fds.events = POLLIN; // Wait until there's data to read
+//
+//     while (ros::ok() && !glfwWindowShouldClose(window))
+//     {
+//         if (poll(&poll_fds, 1, app_params.loop_rate) > 0) {
+//             std::string input_data = getSocketData(sock);
+//             parseControllerInput(input_data);
+//             printText(input.to_str(true));        
+//         }
+//     }
+//
+//     shutdown(sock.sock, SHUT_RDWR);
+// }
 
 
 // -- Window handling --
@@ -448,14 +456,17 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, true);
     }
-    else if (key == GLFW_KEY_TAB && action == GLFW_PRESS) {
-        nextDisplay(active_display, pip_display, disp_info.size());
+    else if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) {
+        layouts.getDisplays().toNextPrimaryDisplay();
+    }
+    else if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) {
+        layouts.getDisplays().toPrevPrimaryDisplay();
     }
     else if (key == GLFW_KEY_C && action == GLFW_PRESS) {
         clutch_mode = !clutch_mode;
     }
     else if (key == GLFW_KEY_P && action == GLFW_PRESS) {
-        pip_enabled = !pip_enabled;
+        // TODO: Enable PiP
     }
 }
 
@@ -474,38 +485,32 @@ void Image::generateEmptyTexture(uint tex_num)
 }
 
 void App::updateOutputImage()
-{
-    DDisplay cur_disp = disp_info.at(active_display);
-    uint disp_size = cur_disp.image.size;
+{    
+    const std::vector<uchar> &buffer(layouts.getDisplays().getDataVectorForRole(DisplayRole_Primary));
 
-    if (disp_size != out_img.size) {
-        // TODO: Figure out how to deal with different sizes
-    }
-
-    out_img.data.assign(cur_disp.image.data.data(), cur_disp.image.data.data() + cur_disp.image.data.size());
     glActiveTexture(0);
-    glBindTexture(GL_TEXTURE_2D, out_img.id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, out_img.width, out_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)out_img.data.data());
+    glBindTexture(GL_TEXTURE_2D, 1); // TODO: ID should be a variable
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, out_img.width, out_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)buffer.data());
 }
 
-void App::updatePipImage()
-{
-    DDisplay cur_disp = disp_info.at(pip_display);
-    uint disp_size = cur_disp.image.size;
-
-    if (disp_size != out_img.size) {
-        // TODO: Figure out how to deal with different sizes
-    }
-
-    cv::Mat flip_mat = cv::Mat(cur_disp.image.width, cur_disp.image.height, CV_8UC3, cur_disp.image.data.data());
-    cv::flip(flip_mat, flip_mat, 0);
-
-    pip_img.resize(cur_disp.image.width, cur_disp.image.height, cur_disp.image.channels);
-    pip_img.copy_data(flip_mat);
-    glActiveTexture(2);
-    glBindTexture(GL_TEXTURE_2D, pip_img.id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, pip_img.width, pip_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)pip_img.data.data());
-}
+// void App::updatePipImage()
+// {
+//     DDisplay cur_disp = disp_info.at(pip_display);
+//     uint disp_size = cur_disp.image.size;
+//
+//     if (disp_size != out_img.size) {
+//         // TODO: Figure out how to deal with different sizes
+//     }
+//
+//     cv::Mat flip_mat = cv::Mat(cur_disp.image.width, cur_disp.image.height, CV_8UC3, cur_disp.image.data.data());
+//     cv::flip(flip_mat, flip_mat, 0);
+//
+//     pip_img.resize(cur_disp.image.width, cur_disp.image.height, cur_disp.image.channels);
+//     pip_img.copy_data(flip_mat);
+//     glActiveTexture(2);
+//     glBindTexture(GL_TEXTURE_2D, pip_img.id);
+//     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, pip_img.width, pip_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)pip_img.data.data());
+// }
 
 MMesh generateSquare()
 {
@@ -609,60 +614,60 @@ void App::buildLayoutsMenu()
     active_layout->displayLayoutParams();
 }
 
-void App::buildDisplaySelectors()
-{
-    const char *disp_preview = disp_info.at(active_display).name.c_str(); 
-    if (ImGui::BeginCombo("Primary", disp_preview, ImGuiComboFlags_None))
-    {
-        for (int n = 0; n < disp_info.size(); n++)
-        {
-            const char *cam_name = disp_info.at(n).name.c_str();
-            const bool is_selected = (active_display == n);
-            if (ImGui::Selectable(cam_name, is_selected)) {
-                active_display = n;
-            }
+// void App::buildDisplaySelectors()
+// {
+//     const char *disp_preview = disp_info.at(active_display).name.c_str(); 
+//     if (ImGui::BeginCombo("Primary", disp_preview, ImGuiComboFlags_None))
+//     {
+//         for (int n = 0; n < disp_info.size(); n++)
+//         {
+//             const char *cam_name = disp_info.at(n).name.c_str();
+//             const bool is_selected = (active_display == n);
+//             if (ImGui::Selectable(cam_name, is_selected)) {
+//                 active_display = n;
+//             }
 
-            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-            if (is_selected) {
-                ImGui::SetItemDefaultFocus();
-            }
-        }
+//             // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+//             if (is_selected) {
+//                 ImGui::SetItemDefaultFocus();
+//             }
+//         }
 
-        ImGui::EndCombo();
-    }
+//         ImGui::EndCombo();
+//     }
 
-    mismatchDisplays(active_display, pip_display, disp_info.size());
+//     // mismatchDisplays(active_display, pip_display, disp_info.size());
 
-    if (disp_info.size() > 1) {
-        ImGui::Checkbox("Pic-in-Pic Enabled", &pip_enabled);
-        if (pip_enabled) {
-            const char *pip_preview = pip_preview = disp_info.at(pip_display).name.c_str(); 
-            if (ImGui::BeginCombo("Pic-in-Pic", pip_preview, ImGuiComboFlags_None))
-            {
-                for (int n = 0; n < disp_info.size(); n++)
-                {
-                    // Skip currently active main display
-                    if (active_display == n) {
-                        continue;
-                    }
+//     if (disp_info.size() > 1) {
+//         ImGui::Checkbox("Pic-in-Pic Enabled", &pip_enabled);
+//         if (pip_enabled) {
+//             const char *pip_preview = pip_preview = disp_info.at(pip_display).name.c_str(); 
+//             if (ImGui::BeginCombo("Pic-in-Pic", pip_preview, ImGuiComboFlags_None))
+//             {
+//                 for (int n = 0; n < disp_info.size(); n++)
+//                 {
+//                     // Skip currently active main display
+//                     if (active_display == n) {
+//                         continue;
+//                     }
 
-                    const char *cam_name = disp_info.at(n).name.c_str();
-                    const bool is_selected = (pip_display == n);
-                    if (ImGui::Selectable(cam_name, is_selected)) {
-                        pip_display = n;
-                    }
+//                     const char *cam_name = disp_info.at(n).name.c_str();
+//                     const bool is_selected = (pip_display == n);
+//                     if (ImGui::Selectable(cam_name, is_selected)) {
+//                         pip_display = n;
+//                     }
 
-                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                    if (is_selected) {
-                        ImGui::SetItemDefaultFocus();
-                    }
-                }
+//                     // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+//                     if (is_selected) {
+//                         ImGui::SetItemDefaultFocus();
+//                     }
+//                 }
 
-                ImGui::EndCombo();
-            }
-        }
-    }
-}
+//                 ImGui::EndCombo();
+//             }
+//         }
+//     }
+// }
 
 void App::buildPiPWindow()
 {
@@ -687,12 +692,22 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
         return;
     }
 
-    cv::Mat image = cur_img->image;
-    int data_size = image.cols * image.rows * image.channels();
-    if (data_size > disp_info.at(index).image.size) {
-        disp_info.at(index).image.resize(image.cols, image.rows, image.channels());
-    }
-    disp_info.at(index).image.copy_data(image);
+    // TEST
+    // if (layouts.getDisplays().getPrimaryDisplayIx() == index) {
+        layouts.getDisplays().fillBufferForDisplayIx(index, cur_img->image);
+    // }
+
+    std::cout << std::endl;
+
+    // TODO: This should probably call a function to check whether a fill is needed
+    // and perform the fill, rather than handling it manually
+
+    // cv::Mat image = cur_img->image;
+    // int data_size = image.cols * image.rows * image.channels();
+    // if (data_size > disp_info.at(index).image.size) {
+    //     disp_info.at(index).image.resize(image.cols, image.rows, image.channels());
+    // }
+    // disp_info.at(index).image.copy_data(image);
 }
 
 
@@ -720,8 +735,8 @@ int App::run(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, overlay);
     
-    pip_img = Image();
-    pip_img.generateEmptyTexture(3);
+    // pip_img = Image();
+    // pip_img.generateEmptyTexture(3);
 
     // -- Set up shaders --
     std::string base_path("resources/shaders/");
@@ -734,7 +749,7 @@ int App::run(int argc, char *argv[])
 
 
     // Split robot control into its own thread to improve performance
-    std::thread robot_control(&App::handleRobotControl, this);
+    // std::thread robot_control(&App::handleRobotControl, this);
 
 
     ros::Rate loop_rate(app_params.loop_rate);
@@ -750,9 +765,9 @@ int App::run(int argc, char *argv[])
         ImGui::ShowDemoWindow();
         
         ImGuiWindowFlags win_flags = 0;
-        win_flags |= ImGuiWindowFlags_NoScrollbar;
-        win_flags |= ImGuiWindowFlags_NoResize;
-        buildMenu("Displays", &App::buildDisplaySelectors, win_flags);
+        // win_flags |= ImGuiWindowFlags_NoScrollbar;
+        // win_flags |= ImGuiWindowFlags_NoResize;
+        // buildMenu("Displays", &App::buildDisplaySelectors, win_flags);
 
         win_flags = 0;
         win_flags |= ImGuiWindowFlags_NoScrollbar;
@@ -760,30 +775,30 @@ int App::run(int argc, char *argv[])
         win_flags |= ImGuiWindowFlags_MenuBar;
         win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
         ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, main_viewport->GetWorkPos().y + 50), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, main_viewport->GetWorkPos().y + 30), ImGuiCond_Always);
         // ImGui::SetNextWindowSize(ImVec2(200, 250), ImGuiCond_Always);
         buildMenu(layouts.window_title, &App::buildLayoutsMenu, win_flags);
 
 
-        if (pip_enabled) {
-            win_flags = 0;
-            win_flags |= ImGuiWindowFlags_NoScrollbar;
-            win_flags |= ImGuiWindowFlags_NoResize;
-            win_flags |= ImGuiWindowFlags_NoCollapse;
-            win_flags |= ImGuiWindowFlags_NoSavedSettings;
-            ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
-            ImGui::SetNextWindowPos(ImVec2(app_params.WINDOW_WIDTH - app_params.pip_width-120, app_params.WINDOW_HEIGHT - app_params.pip_height-100));
-            DDisplay pip_disp = disp_info.at(pip_display);
-            std::string disp_name = pip_disp.display_name;
-            buildMenu(disp_name.c_str(), &App::buildPiPWindow, win_flags);
-        }
+        // if (pip_enabled) {
+        //     win_flags = 0;
+        //     win_flags |= ImGuiWindowFlags_NoScrollbar;
+        //     win_flags |= ImGuiWindowFlags_NoResize;
+        //     win_flags |= ImGuiWindowFlags_NoCollapse;
+        //     win_flags |= ImGuiWindowFlags_NoSavedSettings;
+        //     ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
+        //     ImGui::SetNextWindowPos(ImVec2(app_params.WINDOW_WIDTH - app_params.pip_width-120, app_params.WINDOW_HEIGHT - app_params.pip_height-100));
+        //     DDisplay pip_disp = disp_info.at(pip_display);
+        //     std::string disp_name = pip_disp.display_name;
+        //     buildMenu(disp_name.c_str(), &App::buildPiPWindow, win_flags);
+        // }
         // ---
 
         updateOutputImage();
 
-        if (pip_enabled) {
-            updatePipImage();
-        }
+        // if (pip_enabled) {
+        //     updatePipImage();
+        // }
 
         bg_shader.setBool("overlay_on", clutch_mode);
 
@@ -808,10 +823,13 @@ int App::run(int argc, char *argv[])
 
         // ImGui::EndFrame();
 
+        startTiming();
         ros::spinOnce();
+        stopTiming();
+
         loop_rate.sleep();
     }
-    robot_control.join();
+    // robot_control.join();
     shutdownApp();
 
     return 0;

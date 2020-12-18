@@ -89,15 +89,6 @@ namespace viewpoint_interface
         }
     };
 
-    struct DDisplay
-    {
-        std::string name, topic_name, display_name;
-        Image image;
-
-        DDisplay() : name(""), topic_name(""), display_name("") {}
-        DDisplay(std::string n, std::string t, std::string d, uint w, uint h, uint c) : name(n), topic_name(t), 
-                display_name(d), image(Image(w, h, c)) {}
-    };
 
     struct Mesh
     {
@@ -144,11 +135,7 @@ namespace viewpoint_interface
         static constexpr float WIDTH_FAC = 1.0f;
         static constexpr float HEIGHT_FAC = 1.0f;
 
-        App(AppParams params=AppParams()) : app_params(params)
-        {
-            pip_enabled = clutch_mode = false;
-            active_display = pip_display = 0;
-        }
+        App(AppParams params=AppParams()) : app_params(params) {}
 
         int run(int argc, char *argv[]);
 
@@ -160,11 +147,6 @@ namespace viewpoint_interface
         Input input;
         Socket sock;
         LayoutManager layouts;
-        std::map<uint, DDisplay> disp_info;
-        uint active_display;
-        bool pip_enabled; // pip = Picture-in-picture
-        uint pip_tex;
-        uint pip_display;
         bool clutch_mode;
 
         // ROS
@@ -207,11 +189,6 @@ namespace viewpoint_interface
 } // viewpoint_interface
 
 void printText(std::string text="", int newlines=1, bool flush=false);
-uint getNextIndex(uint ix, uint size);
-uint getPreviousIndex(uint ix, uint size);
-void mismatchDisplays(uint &disp1, uint &disp2, uint size);
-void nextDisplay(uint &disp1, uint &disp2, uint size, bool bump=true);
-void previousDisplay(uint &disp1, uint &disp2, uint size, bool bump=true);
 
 void glfwErrorCallback(int code, const char* description);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);

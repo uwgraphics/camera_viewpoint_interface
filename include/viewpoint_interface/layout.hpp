@@ -73,21 +73,19 @@ namespace viewpoint_interface
             const int max_items = 5; // Max number of displays to list w/o scrolling
 
             int total_displays = displays.size();
-            if (total_displays > 1) {
+            int opt_shown = total_displays > max_items ? max_items : total_displays;
+            if (ImGui::ListBoxHeader("Available\nDisplays", total_displays, opt_shown)) {
+                for (int i = 0; i < total_displays; i++) {
+                    bool active = displays.isDisplayActive(i);
 
-                int opt_shown = total_displays > max_items ? max_items : total_displays;
-                if (ImGui::ListBoxHeader("Available\nDisplays", total_displays, opt_shown)) {
-                    for (int i = 0; i < total_displays; i++) {
-                        bool active = displays.isActive(i);
-
-                        if (ImGui::Selectable(displays[i].getInternalName().c_str(), active)) {
-                            // TODO: Shouldn't be able to turn off all the displays
-                            displays.flipState(i);
+                    if (ImGui::Selectable(displays[i].getInternalName().c_str(), active)) {
+                        if (!displays.isDisplayActive(i) || displays.getNumActiveDisplays() > 1) {
+                            displays.flipDisplayState(i);
                         }
                     }
-
-                    ImGui::ListBoxFooter();
                 }
+
+                ImGui::ListBoxFooter();
             }
 
             ImGui::Separator();
@@ -106,7 +104,7 @@ namespace viewpoint_interface
                     const bool is_primary = (i == displays.getPrimaryDisplayIx());
                     std::string disp_name = displays[i].getInternalName();
                     if (ImGui::Selectable(disp_name.c_str(), is_primary))
-                        displays.setPrimaryDisplayIx(i);
+                        displays.setPrimaryDisplay(i);
 
                     // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                     if (is_primary) {
@@ -124,15 +122,21 @@ namespace viewpoint_interface
             uint disps_num = displays.getNumActiveDisplays();
             if (ImGui::ListBoxHeader("Display\nOrder", disps_num)) {
                 for (int i = 0; i < displays.size(); i++) {
-                    if (!displays.isActive(i)) {
+                    if (!displays.isDisplayActive(i)) {
                         continue;
                     }
 
                     if (i == displays.getPrimaryDisplayIx()) {
-                        ImVec4 prev_color = style.Colors[ImGuiCol_Header];
-                        style.Colors[ImGuiCol_Header] = displays.getPrimaryColor();
+                        ImVec4 active_color = style.Colors[ImGuiCol_HeaderActive];
+                        ImVec4 hovered_color = style.Colors[ImGuiCol_HeaderHovered];
+                        ImVec4 header_color = style.Colors[ImGuiCol_Header];
+                        style.Colors[ImGuiCol_HeaderActive] = displays.getPrimaryColorActive();
+                        style.Colors[ImGuiCol_HeaderHovered] = displays.getPrimaryColorHovered();
+                        style.Colors[ImGuiCol_Header] = displays.getPrimaryColorBase();
                         ImGui::Selectable(displays[i].getInternalName().c_str(), true);
-                        style.Colors[ImGuiCol_Header] = prev_color;
+                        style.Colors[ImGuiCol_Header] = header_color;
+                        style.Colors[ImGuiCol_HeaderHovered] = hovered_color;
+                        style.Colors[ImGuiCol_HeaderActive] = active_color;
                     }
                     else {
                         ImGui::Selectable(displays[i].getInternalName().c_str());
@@ -337,16 +341,6 @@ namespace viewpoint_interface
             return active_layout;
         }
 
-        void addDisplay(const Display &disp)
-        {
-            displays.addDisplay(disp);
-        }
-
-        const DisplayManager &getDisplays() const
-        {
-            return displays;
-        }
-
         void activateLayout(LayoutType type)
         {
             // Already active
@@ -393,6 +387,11 @@ namespace viewpoint_interface
             }
 
             return false;
+        }
+
+        DisplayManager &getDisplays()
+        {
+            return displays;
         }
 
     private:
