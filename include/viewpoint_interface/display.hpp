@@ -25,15 +25,18 @@ namespace viewpoint_interface
         uint int_size;
     };
 
-
-    struct DisplayBuffers
+    struct DisplayInfo
     {
-        DisplayDims dimensions;
+        uint id;
+        std::string internal, external, topic;
         std::vector<uchar> data;
 
-        DisplayBuffers(DisplayDims dims=DisplayDims{1024, 1024, 3}) : dimensions(dims)
+        DisplayInfo(std::string &int_name, std::string &ext_name, std::string &topic_name) : 
+                internal(int_name), external(ext_name), topic(topic_name) {}
+
+        void setDataSize(uint size)
         {
-            data = std::vector<uchar>(dimensions.size());
+            data.resize(size);
         }
     };
 
@@ -43,18 +46,30 @@ namespace viewpoint_interface
     public:
 
         Display(std::string &internal, std::string &external, std::string &topic, const DisplayDims &dims) :
-                int_name(internal), ext_name(external), topic_name(topic), dimensions(dims), active(true) {}
+                info(internal, external, topic), dimensions(dims), active(true)
+        {
+            info.id = getNextId();
+            info.setDataSize(dimensions.size());
+        }
 
-        inline std::string getInternalName() const { return int_name; }
-        inline std::string getExternalName() const { return ext_name; }
-        inline std::string getTopicName() const { return topic_name; }
+        inline uint getId() const { return info.id; }
+        inline std::string getInternalName() const { return info.internal; }
+        inline std::string getExternalName() const { return info.external; }
+        inline std::string getTopicName() const { return info.topic; }
+        inline const DisplayInfo& getDisplayInfo() const { return info; }
 
         const DisplayDims& dims() const { return dimensions; }
 
     private:
-        std::string int_name, ext_name, topic_name;
-        DisplayDims dimensions;
         bool active;
+        DisplayInfo info;
+        DisplayDims dimensions;
+
+        uint getNextId() 
+        { 
+            static uint current_id = 0;
+            return current_id++;
+        }
 
         bool isActive() const { return active; }
         void activate() { active = true; }
@@ -66,68 +81,45 @@ namespace viewpoint_interface
             return new_state;
         }
 
+        void copyImage(const cv::Mat &image)
+        {
+            info.data.assign(image.data, image.data + image.total()*image.channels());
+        }
+
         friend class DisplayManager;
     };
 
 
-    enum class DisplayLoadHint
-    {
-        DisplayHint_LoadOne,    // Load only one display--unable to predict next one
-        DisplayHint_Neighbors   // Load previous and next displays in ring
-    };
-
-    enum DisplayRole
-    {
-        DisplayRole_Primary,
-        DisplayRole_Secondary1
-    };
-
     class DisplayManager
     {
     public:
-        static const uint max_buffers = 9;
-
-        DisplayManager(uint num=max_buffers)
-        {
-            for (int i = 0; i < num; i++) {
-                buffers.push_back(DisplayBuffers());
-            }
-        }
+        DisplayManager() {}
 
         uint size() const { return displays.size(); }
-
-        Display &operator [](uint ix)
-        {
-            return displays.at(ix);
-        }
 
         void addDisplay(const Display &disp)
         {
             uint ix = displays.size();
 
-            active_displays.push_back(ix);
             displays.push_back(disp);
             num_active_displays++;
-
-            if (ix == primary_display_ix) {
-                bindDisplayToBufferIx(ix, primary_buffer_ix);
-            }
-            else {
-                // TODO: Handle secondary displays
-                bindDisplayToBufferIx(ix, UNBOUND_BUFFER);
-            }
         }
 
         bool isDisplayActive(uint ix) const { return displays[ix].isActive(); }
-        void activateDisplay(uint ix) { displays[ix].activate(); num_active_displays++; }
+        void activateDisplay(uint ix) 
+        { 
+            if (displays[ix].isActive()) {
+                return;
+            }
+
+            displays[ix].activate(); 
+            num_active_displays++; 
+        }
+
         void deactivateDisplay(uint ix) 
         { 
-            displays[ix].deactivate(); 
+            displays[ix].deactivate();
             num_active_displays--;
-            
-            if (primary_display_ix == ix) {
-                setPrimaryDisplay(nextActiveDisplayIx());
-            }
         }
 
         void flipDisplayState(uint ix) 
@@ -137,105 +129,101 @@ namespace viewpoint_interface
             }
             else {
                 num_active_displays--;
-
-                if (primary_display_ix == ix) {
-                    setPrimaryDisplay(nextActiveDisplayIx());
-                }
             }
+        }
+
+        uint getDisplayId(uint ix) const
+        {
+            return displays[ix].getId();
+        }
+
+        std::string getDisplayExternalName(uint ix) const 
+        { 
+            return displays[ix].getExternalName(); 
+        }
+
+        std::string getDisplayInternalName(uint ix) const 
+        { 
+            return displays[ix].getInternalName(); 
+        }
+
+        std::string getDisplayTopicName(uint ix) const 
+        { 
+            return displays[ix].getTopicName(); 
+        }
+
+        const DisplayInfo& getDisplayInfo(uint ix) const
+        { 
+            return displays[ix].getDisplayInfo(); 
         }
 
         uint getNumActiveDisplays() const { return num_active_displays; }
 
-        uint getPrimaryDisplayIx() const { return primary_display_ix; }
-        void setPrimaryDisplay(uint ix)
+        uint getNumTotalDisplays() const { return displays.size(); }
+
+        uint getDisplayIxById(uint id) const
         {
-            if (ix == primary_display_ix) {
-                return;
+            for (int i = 0; i < displays.size(); i++) {
+                if (displays[i].getId() == id) {
+                    return i;
+                }
             }
 
-            unbindDisplayFromBufferIx(primary_display_ix);
-            primary_display_ix = ix;
-            bindDisplayToBufferIx(ix, primary_buffer_ix);
+            return 0;
         }
 
-        const Display &getPrimaryDisplay() const { return displays.at(primary_display_ix); }
-        ImVec4 getPrimaryColorActive() const { return primary_color_active; }
-        ImVec4 getPrimaryColorHovered() const { return primary_color_hovered; }
-        ImVec4 getPrimaryColorBase() const { return primary_color_base; }
+        uint getNextActiveDisplayIx(int ix) const
+        {
+            if (num_active_displays == 0) { return 0; }
 
+            uint next_ix = nextIx(ix, displays.size());
+            while (!isDisplayActive(next_ix))
+            {
+                next_ix = nextIx(next_ix, displays.size());
+            }
+            
+            return next_ix;
+        }
+
+        uint getNextActiveDisplayId(int ix) const
+        {
+            return getDisplayId(getNextActiveDisplayIx(ix));
+        }
+
+        uint getPrevActiveDisplayIx(int ix) const
+        {
+            if (num_active_displays == 0) { return 0; }
+
+            uint prev_ix = prevIx(ix, displays.size());
+            while (!isDisplayActive(prev_ix))
+            {
+                prev_ix = prevIx(prev_ix, displays.size());
+            }
+            
+            return prev_ix;
+        }
+
+        uint getPrevActiveDisplayId(int ix) const
+        {
+            return getDisplayId(getPrevActiveDisplayIx(ix));
+        }
 
         void swapDisplays(uint ix1, uint ix2)
         {
-            if (ix1 == primary_display_ix) {
-                setPrimaryDisplay(ix2);
-            }
-            else if (ix2 == primary_display_ix) {
-                setPrimaryDisplay(ix1);
-            }
-
             std::vector<Display> &vec(displays);
             std::iter_swap(vec.begin() + ix1, vec.begin() + ix2);
         }
 
-        void toNextPrimaryDisplay() { setPrimaryDisplay(nextActiveDisplayIx()); }
-        void toPrevPrimaryDisplay() { setPrimaryDisplay(prevActiveDisplayIx()); }
-
-        void fillBufferForDisplayIx(uint ix, const cv::Mat &image)
+        void copyImageToDisplay(uint ix, const cv::Mat &image)
         {
-            // TODO: Figure out what to do if image size != buffer size
-
-            int buffer_ix = getBufferIxForDisplay(ix);
-            // TODO: Verify whether buffer will ever be unbound at this point
-            // Bind it if so
-
-            DisplayBuffers &buffer(getBuffer(buffer_ix));
-            buffer.data.assign(image.data, image.data + image.total()*image.channels());
+            displays[ix].copyImage(image);
         }
 
-        const std::vector<uchar> &getDataVectorForDisplayIx(uint ix)
-        {
-            return buffers.at(getBufferIxForDisplay(ix)).data;
-        }
 
-        const std::vector<uchar> &getDataVectorForRole(DisplayRole role)
-        {
-            switch(role)
-            {
-                case DisplayRole::DisplayRole_Primary:
-                {                    
-                    return buffers.at(primary_buffer_ix).data;
-                }   break;
-
-                default:
-                {
-                    return buffers.at(primary_buffer_ix).data;
-                }
-            }
-        }
-
-        void bufferDisplay()
-        {
-            // TODO: Allow manually buffering
-        }
-
-    private:
-        uint primary_display_ix = 0;
-        
-        const ImVec4 primary_color_active{10.0/255, 190.0/255, 10.0/255, 255.0/255};
-        const ImVec4 primary_color_hovered{10.0/255, 190.0/255, 10.0/255, 200.0/255};
-        const ImVec4 primary_color_base{10.0/255, 190.0/255, 10.0/255, 150.0/255};
-       
+    private:       
         uint num_active_displays = 0;
-        std::vector<uint> active_displays;
         std::vector<Display> displays;
-        std::vector<uint> display_ring; // TODO: Implement functions to handle ring
-        // We should not disrupt displays vector since we need it for the buffer assignments
-        // Right now, we can't rearrange displays w/o affecting the match of active to buffer
 
-        uint primary_buffer_ix = 0;
-        const int UNBOUND_BUFFER = -1;
-        std::map<uint, int> displays_to_buffers;
-        std::vector<DisplayBuffers> buffers;
 
         uint nextIx(uint ix, uint size) const
         {
@@ -247,68 +235,6 @@ namespace viewpoint_interface
             return (ix == 0) ? (size - 1) : (ix - 1);
         }
 
-        uint nextActiveDisplayIx() const
-        {
-            if (active_displays.size() == 0) { return 0; }
-            if (active_displays.size() == 1) { return primary_display_ix; }
-
-            uint next_ix = nextIx(primary_display_ix, displays.size());
-            while (!isDisplayActive(next_ix))
-            {
-                next_ix = nextIx(next_ix, displays.size());
-            }
-            
-            return next_ix;
-        }
-
-        uint prevActiveDisplayIx() const
-        {
-            if (active_displays.size() == 0) { return 0; }
-            if (active_displays.size() == 1) { return primary_display_ix; }
-
-            uint prev_ix = prevIx(primary_display_ix, displays.size());
-            while (!isDisplayActive(prev_ix))
-            {
-                prev_ix = prevIx(prev_ix, displays.size());
-            }
-            
-            return prev_ix;
-        }
-
-        bool isDisplayBoundToBuffer(uint ix)
-        {
-            return displays_to_buffers[ix] != UNBOUND_BUFFER;
-        }
-
-        void bindDisplayToBufferIx(uint disp_ix, int buffer_ix)
-        {
-            displays_to_buffers[disp_ix] = buffer_ix;
-        }
-
-        void unbindDisplayFromBufferIx(uint disp_ix)
-        {
-            displays_to_buffers[disp_ix] = UNBOUND_BUFFER;
-        }
-
-        inline int getBufferIxForDisplay(uint ix)
-        {
-            return displays_to_buffers[ix];
-        }
-
-        DisplayBuffers &getBuffer(uint ix)
-        {
-            return buffers.at(ix);
-        }
-
-        // uint numBuffersUsed() const
-        // {
-        //     return active_buffers.size();
-        // }
-
-        // bool isBufferAvailable() const
-        // {
-        //     return numBuffersUsed() < max_buffers;
-        // }
     };
 
 } // viewpoint_interface
