@@ -2,7 +2,8 @@
 
 ## Dependencies
 ### ROS Packages
-- RelaxedIK
+ - cv_bridge
 
-### Tools
+### Packages
 - Cmake: 3.12.4 version min
+- OpenCV
