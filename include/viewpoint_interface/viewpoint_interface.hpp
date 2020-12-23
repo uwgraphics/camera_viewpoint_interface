@@ -135,7 +135,7 @@ namespace viewpoint_interface
         static constexpr float WIDTH_FAC = 1.0f;
         static constexpr float HEIGHT_FAC = 1.0f;
 
-        App(AppParams params=AppParams()) : app_params(params) {}
+        App(AppParams params=AppParams()) : app_params(params), spinner(ros::AsyncSpinner(0)) {}
 
         int run(int argc, char *argv[]);
 
@@ -150,7 +150,9 @@ namespace viewpoint_interface
         bool clutch_mode;
 
         // ROS
-        std::vector<ros::Subscriber> cam_subs;
+        ros::NodeHandle n;
+        ros::AsyncSpinner spinner;
+        std::vector<ros::Subscriber> disp_subs;
 
         // GUI
         GLFWwindow* window;

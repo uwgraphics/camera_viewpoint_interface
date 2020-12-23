@@ -4,9 +4,6 @@
 #include <sys/socket.h>
 #include <poll.h>
 #include <netinet/in.h>
-#include <thread>
-
-#include <chrono> // TEST
 
 // ROS
 #include <sensor_msgs/Image.h>
@@ -24,6 +21,7 @@
 #include "imgui_impl_opengl3.h"
 
 // Custom headers
+#include "viewpoint_interface/helpers.hpp"
 #include "viewpoint_interface/json.hpp"
 #include "viewpoint_interface/viewpoint_interface.hpp"
 #include "viewpoint_interface/shader.hpp"
@@ -44,6 +42,8 @@ using Socket = viewpoint_interface::Socket;
  */
 int main(int argc, char *argv[])
 {   
+    ros::init(argc, argv, "viewpoint_interface");
+
     App app = App();
     app.run(argc, argv);
     
@@ -51,50 +51,6 @@ int main(int argc, char *argv[])
 }
 
 // -- Helper functions --
-/**
- * Print a string to the screen.
- * 
- * Params:
- * 		text - text to print
- * 		newlines - number of newlines to print at the end of input string
- * 		flush - whether to flush text. Generally, only needed when
- * 			printing a large body of text with manual newlines
- */
-void printText(std::string text, int newlines, bool flush)
-{
-    // TODO: Consider adding param for width of text line
-    std::cout << text;
-
-    for (int i = 0; i < newlines; i++) {
-        if (i > 1) {
-            std::cout << "\n";
-        }
-        else {
-            std::cout << std::endl;
-        }
-    }
-
-    if (flush) {
-        std::cout.flush();
-    }
-
-    return;
-}
-
-
-// TEST
-auto start = std::chrono::high_resolution_clock::now();
-void startTiming()
-{
-    start = std::chrono::high_resolution_clock::now();
-}
-
-void stopTiming()
-{
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Time: " << duration.count() << std::endl;
-}
 
 
 // void mismatchDisplays(uint &disp1, uint &disp2, uint size)
@@ -189,7 +145,7 @@ bool App::parseCameraFile()
             max_channels = c;
         }
 
-        layouts.getDisplays().addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
+        layouts.addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
     }
 
     out_img = Image(max_width, max_height, max_channels);
@@ -238,15 +194,12 @@ bool App::initializeSocket()
 
 void App::initializeROS(int argc, char *argv[])
 {
-    ros::init(argc, argv, "viewpoint_interface");
-    ros::NodeHandle n;
-
-    DisplayManager displays(layouts.getDisplays());
+    spinner.start();
     
-    for (int i = 0; i < displays.size(); i++) {
-        ros::Subscriber cam_sub(n.subscribe<sensor_msgs::Image>(displays[i].getTopicName(), 10, 
+    for (int i = 0; i < layouts.getNumTotalDisplays(); i++) {
+        ros::Subscriber disp_sub(n.subscribe<sensor_msgs::Image>(layouts.getDisplayInfo(i).topic, 10, 
                 boost::bind(&App::cameraImageCallback, this, _1, i)));
-        cam_subs.push_back(cam_sub);
+        disp_subs.push_back(disp_sub);
     }
 }
 
@@ -330,9 +283,11 @@ void App::initializeImGui()
 
 void App::shutdownApp()
 {
+    // Triggers when we're shutting down b/c window was closed
     if (ros::ok()) {
         ros::shutdown();
     }
+    spinner.stop();
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -453,21 +408,27 @@ void App::keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int a
 
 void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, true);
+    if (action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_ESCAPE:
+            {
+                glfwSetWindowShouldClose(window, true);
+            } break;
+
+            default:
+            {
+                layouts.handleKeyInput(key, action, mods);
+            } break;
+        }
     }
-    else if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) {
-        layouts.getDisplays().toNextPrimaryDisplay();
-    }
-    else if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) {
-        layouts.getDisplays().toPrevPrimaryDisplay();
-    }
-    else if (key == GLFW_KEY_C && action == GLFW_PRESS) {
-        clutch_mode = !clutch_mode;
-    }
-    else if (key == GLFW_KEY_P && action == GLFW_PRESS) {
-        // TODO: Enable PiP
-    }
+
+
+    // else if (key == GLFW_KEY_C && action == GLFW_PRESS) {
+    //     clutch_mode = !clutch_mode;
+    // }
+    // else if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+    //     // TODO: Enable PiP
+    // }
 }
 
 
@@ -485,12 +446,11 @@ void Image::generateEmptyTexture(uint tex_num)
 }
 
 void App::updateOutputImage()
-{    
-    const std::vector<uchar> &buffer(layouts.getDisplays().getDataVectorForRole(DisplayRole_Primary));
-
+{   
     glActiveTexture(0);
     glBindTexture(GL_TEXTURE_2D, 1); // TODO: ID should be a variable
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, out_img.width, out_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)buffer.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, out_img.width, out_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, 
+            (GLvoid*)layouts.getDisplayInfo(1).data.data());
 }
 
 // void App::updatePipImage()
@@ -566,52 +526,6 @@ void App::buildMenu(std::string title, void (App::*build_func)(void), ImGuiWindo
     (this->*build_func)();
     ImGui::PopItemWidth();
     ImGui::End();
-}
-
-void App::buildLayoutsMenu()
-{
-    std::shared_ptr<Layout> active_layout = layouts.getActiveLayout();
-
-    if (ImGui::BeginMenuBar())
-    {
-        if (ImGui::BeginMenu(active_layout->getLayoutName().c_str())) {
-            std::vector<std::string> layout_names = layouts.getLayoutList();
-            bool selected;
-            bool inactivate = false;
-
-            selected = layouts.isLayoutActive(LayoutType::NONE);
-            ImGui::MenuItem("Inactivate", NULL, &selected);
-            if (selected)
-            {
-                layouts.activateLayout(LayoutType::NONE);
-            }
-
-            for (int i = 0; i < layout_names.size(); i++) {
-                LayoutType layout_type = layouts.intToLayoutType(i);
-                
-                if (layouts.isLayoutExcluded(layout_type)) {
-                    continue;
-                }
-
-                selected = layouts.isLayoutActive(layout_type);
-                ImGui::MenuItem(layout_names[i].c_str(), NULL, &selected);
-
-                if (selected) {
-                    layouts.activateLayout(layout_type);
-                }
-            }
-
-            ImGui::EndMenu();
-        }
-
-        ImGui::EndMenuBar();
-    }
-
-    ImGui::Text("Parameters for %s:", active_layout->getLayoutName().c_str());
-    ImGui::Spacing();
-    ImGui::Spacing();
-
-    active_layout->displayLayoutParams();
 }
 
 // void App::buildDisplaySelectors()
@@ -692,22 +606,7 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
         return;
     }
 
-    // TEST
-    // if (layouts.getDisplays().getPrimaryDisplayIx() == index) {
-        layouts.getDisplays().fillBufferForDisplayIx(index, cur_img->image);
-    // }
-
-    std::cout << std::endl;
-
-    // TODO: This should probably call a function to check whether a fill is needed
-    // and perform the fill, rather than handling it manually
-
-    // cv::Mat image = cur_img->image;
-    // int data_size = image.cols * image.rows * image.channels();
-    // if (data_size > disp_info.at(index).image.size) {
-    //     disp_info.at(index).image.resize(image.cols, image.rows, image.channels());
-    // }
-    // disp_info.at(index).image.copy_data(image);
+    layouts.forwardImageForDisplayIx(index, cur_img->image);
 }
 
 
@@ -763,21 +662,13 @@ int App::run(int argc, char *argv[])
         ImGui::NewFrame();
 
         ImGui::ShowDemoWindow();
+
+        layouts.draw();
         
-        ImGuiWindowFlags win_flags = 0;
+        // ImGuiWindowFlags win_flags = 0;
         // win_flags |= ImGuiWindowFlags_NoScrollbar;
         // win_flags |= ImGuiWindowFlags_NoResize;
         // buildMenu("Displays", &App::buildDisplaySelectors, win_flags);
-
-        win_flags = 0;
-        win_flags |= ImGuiWindowFlags_NoScrollbar;
-        win_flags |= ImGuiWindowFlags_NoResize;
-        win_flags |= ImGuiWindowFlags_MenuBar;
-        win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
-        ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, main_viewport->GetWorkPos().y + 30), ImGuiCond_Always);
-        // ImGui::SetNextWindowSize(ImVec2(200, 250), ImGuiCond_Always);
-        buildMenu(layouts.window_title, &App::buildLayoutsMenu, win_flags);
 
 
         // if (pip_enabled) {
@@ -823,9 +714,7 @@ int App::run(int argc, char *argv[])
 
         // ImGui::EndFrame();
 
-        startTiming();
-        ros::spinOnce();
-        stopTiming();
+        // ros::spinOnce();
 
         loop_rate.sleep();
     }
