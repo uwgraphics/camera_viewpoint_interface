@@ -1,5 +1,5 @@
 {
-    "_num_cams": 3,
+    "_num_cams": 5,
     "cam0": {
         "internal_name": "dynamic",
         "external_name": "Dynamic Camera",
@@ -20,6 +20,22 @@
         "internal_name": "wide",
         "external_name": "Wide Camera",
         "topic": "/cam/wide_image",
+        "width": 1024,
+        "height": 1024,
+        "channels": 3
+    },
+    "cam3": {
+        "internal_name": "cam4",
+        "external_name": "Camera4",
+        "topic": "/cam/camera4",
+        "width": 1024,
+        "height": 1024,
+        "channels": 3
+    },
+    "cam4": {
+        "internal_name": "cam5",
+        "external_name": "Camera5",
+        "topic": "/cam/camera5",
         "width": 1024,
         "height": 1024,
         "channels": 3
