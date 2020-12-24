@@ -4,6 +4,7 @@
 #include <string>
 #include <algorithm>
 
+#include <glm/vec2.hpp>
 #include <imgui/imgui.h>
 #include "display.hpp"
 
@@ -29,6 +30,41 @@ namespace viewpoint_interface
         ImGui::End();
     }
 
+    template <typename T>
+    int getItemIndexInVector(T item, std::vector<T> &vec)
+    {
+        auto iter = std::find(vec.begin(), vec.end(), item);
+        if(iter != vec.end()) {
+            return iter - vec.begin();
+        }
+
+        return -1;
+    }
+
+    template <typename T>
+    int getItemIndexInVector(T item, const std::vector<T> &vec)
+    {
+        auto iter = std::find(vec.begin(), vec.end(), item);
+        if(iter != vec.end()) {
+            return iter - vec.begin();
+        }
+
+        return -1;
+    }
+
+    template <typename T>
+    bool isItemInVector(T item, std::vector<T> &vec)
+    {
+        return getItemIndexInVector(item, vec) != -1;
+    }
+
+    template <typename T>
+    bool isItemInVector(T item, const std::vector<T> &vec)
+    {
+        return getItemIndexInVector(item, vec) != -1;
+    }
+
+
     // To add/change layouts follow the following steps:
     // - Add/change enum entry for layout
     // - Edit num_layout_types and layout_names in Layout class
@@ -43,6 +79,34 @@ namespace viewpoint_interface
         PIP,
         CAROUSEL
     };
+
+    enum class LayoutDisplayRole
+    {
+        Primary,
+        Secondary
+    };
+
+    struct DisplayImageRequest
+    {
+        std::vector<uchar> &data;
+        uint width, height;
+        LayoutDisplayRole role;
+        uint index;
+
+        DisplayImageRequest(uint w, uint h, std::vector<uchar> &vec, uint ix, LayoutDisplayRole rl) :
+                width(w), height(h), data(vec), index(ix), role(rl) {}
+    };
+
+    struct DisplayImageResponse
+    {
+        LayoutDisplayRole role;
+        uint id;
+        uint index;
+
+        DisplayImageResponse(uint gl_id, uint ix, LayoutDisplayRole rl) : id(gl_id), index(ix),
+                role(rl) {}
+    };
+
     
     class Layout
     {
@@ -72,7 +136,15 @@ namespace viewpoint_interface
             return layout_names[(uint)layout_type];
         }
 
-        inline bool hasPrimaryDisplays() const { return has_primary; }
+        std::vector<DisplayImageRequest>& getImageRequestQueue()
+        {
+            return display_image_queue;
+        }
+
+        void pushImageResponse(const DisplayImageResponse &response)
+        {
+            image_response_queue.push_back(response);
+        }
 
         virtual void displayLayoutParams() = 0;
         virtual void draw() = 0;
@@ -83,12 +155,22 @@ namespace viewpoint_interface
                 switch (key) {
                     case GLFW_KEY_RIGHT:
                     {
-                        toNextPrimaryDisplay(0);
+                        toNextDisplay(0, LayoutDisplayRole::Primary);
                     } break;
 
                     case GLFW_KEY_LEFT:
                     {
-                        toPrevPrimaryDisplay(0);
+                        toPrevDisplay(0, LayoutDisplayRole::Primary);
+                    } break;
+
+                    case GLFW_KEY_UP:
+                    {
+                        toPrevDisplay(0, LayoutDisplayRole::Secondary);
+                    } break;
+
+                    case GLFW_KEY_DOWN:
+                    {
+                        toNextDisplay(0, LayoutDisplayRole::Secondary);
                     } break;
 
                     default:
@@ -100,8 +182,11 @@ namespace viewpoint_interface
 
     protected:
         DisplayManager &displays;
+        std::vector<DisplayImageRequest> display_image_queue;
+        std::vector<DisplayImageResponse> image_response_queue;
+
         std::vector<uint> primary_displays; // Stores display ID
-        std::vector<uint> secondary_displays;
+        std::vector<uint> secondary_displays; // Stores display ID
 
         struct ColorSet
         {
@@ -110,61 +195,45 @@ namespace viewpoint_interface
 
         ColorSet color_cache;
         ColorSet primary_color;
+        ColorSet secondary_color;
 
-        Layout(LayoutType type, DisplayManager &disp, bool prim=true) : layout_type(type), displays(disp),
-                has_primary(prim)
+        Layout(LayoutType type, DisplayManager &disp) : layout_type(type), displays(disp)
+        {
+            primary_color.base =    ImVec4{10.0/255, 190.0/255, 10.0/255, 150.0/255};
+            primary_color.hovered = ImVec4{10.0/255, 190.0/255, 10.0/255, 200.0/255}; 
+            primary_color.active =  ImVec4{10.0/255, 190.0/255, 10.0/255, 255.0/255};
+
+            secondary_color.base =      ImVec4{165.0/255, 100.0/255, 100.0/255, 125.0/255};
+            secondary_color.hovered =   ImVec4{165.0/255, 100.0/255, 100.0/255, 200.0/255}; 
+            secondary_color.active =    ImVec4{165.0/255, 100.0/255, 100.0/255, 255.0/255};
+        }
+
+        void enableDisplayStyle(LayoutDisplayRole role)
+        {
+            ColorSet color_set;
+            switch (role)
             {
-                primary_color.base = ImVec4{10.0/255, 190.0/255, 10.0/255, 150.0/255};
-                primary_color.hovered = ImVec4{10.0/255, 190.0/255, 10.0/255, 200.0/255}; 
-                primary_color.active = ImVec4{10.0/255, 190.0/255, 10.0/255, 150.0/255};
+                case LayoutDisplayRole::Primary:
+                {
+                    color_set = primary_color;
+                }   break;
+
+                case LayoutDisplayRole::Secondary:
+                {
+                    color_set = secondary_color;
+                }   break;
             }
 
-        template <typename T>
-        int getItemIndexInVector(T item, std::vector<T> &vec) const
-        {
-            auto iter = std::find(vec.begin(), vec.end(), item);
-            if(iter != vec.end()) {
-                return iter - vec.begin();
-            }
-
-            return -1;
-        }
-
-        template <typename T>
-        int getItemIndexInVector(T item, const std::vector<T> &vec) const
-        {
-            auto iter = std::find(vec.begin(), vec.end(), item);
-            if(iter != vec.end()) {
-                return iter - vec.begin();
-            }
-
-            return -1;
-        }
-
-        template <typename T>
-        bool isItemInVector(T item, std::vector<T> &vec) const
-        {
-            return getItemIndexInVector(item, vec) != -1;
-        }
-
-        template <typename T>
-        bool isItemInVector(T item, const std::vector<T> &vec) const
-        {
-            return getItemIndexInVector(item, vec) != -1;
-        }
-
-        void enablePrimaryDisplayStyle()
-        {
             ImGuiStyle& style = ImGui::GetStyle();
             color_cache.base = style.Colors[ImGuiCol_Header];
             color_cache.hovered = style.Colors[ImGuiCol_HeaderHovered];
             color_cache.active = style.Colors[ImGuiCol_HeaderActive];
-            style.Colors[ImGuiCol_Header] = primary_color.base;
-            style.Colors[ImGuiCol_HeaderHovered] = primary_color.hovered;
-            style.Colors[ImGuiCol_HeaderActive] = primary_color.active;
+            style.Colors[ImGuiCol_Header] = color_set.base;
+            style.Colors[ImGuiCol_HeaderHovered] = color_set.hovered;
+            style.Colors[ImGuiCol_HeaderActive] = color_set.active;
         }
 
-        void disablePrimaryDisplayStyle()
+        void disableDisplayStyle()
         {
             ImGuiStyle& style = ImGui::GetStyle();
             style.Colors[ImGuiCol_Header] = color_cache.base;
@@ -172,19 +241,38 @@ namespace viewpoint_interface
             style.Colors[ImGuiCol_HeaderActive] = color_cache.active;
         }
 
-        void toNextPrimaryDisplay(uint primary_ix)
+        void toNextDisplay(uint vec_ix, LayoutDisplayRole role)
         {
-            uint cur_ix = displays.getDisplayIxById(primary_displays.at(primary_ix));
+            std::vector<uint> &role_vec(getDisplaysVectorFromRole(role));
+
+            if (role_vec.size() <= vec_ix) {
+                return;
+            }
+
+            uint cur_ix = displays.getDisplayIxById(role_vec.at(vec_ix));
             uint next_ix = displays.getNextActiveDisplayIx(cur_ix);
-            primary_displays[primary_ix] = displays.getDisplayId(next_ix);
+            role_vec[vec_ix] = displays.getDisplayId(next_ix);
         }
 
-        void toPrevPrimaryDisplay(uint primary_ix)
+        void toPrevDisplay(uint vec_ix, LayoutDisplayRole role)
         {
-            uint cur_ix = displays.getDisplayIxById(primary_displays.at(primary_ix));
+            std::vector<uint> &role_vec(getDisplaysVectorFromRole(role));
+
+            if (role_vec.size() <= vec_ix) {
+                return;
+            }
+
+            uint cur_ix = displays.getDisplayIxById(role_vec.at(vec_ix));
             uint prev_ix = displays.getPrevActiveDisplayIx(cur_ix);
-            primary_displays[primary_ix] = displays.getDisplayId(prev_ix);
+            role_vec[vec_ix] = displays.getDisplayId(prev_ix);
         }
+
+        void addImageRequestToQueue(DisplayImageRequest request)
+        {
+            display_image_queue.push_back(request);
+        }
+
+        virtual void handleImageResponse() = 0;
 
         virtual void displayInstructionsWindow(std::string text) const
         {
@@ -194,8 +282,8 @@ namespace viewpoint_interface
             win_flags |= ImGuiWindowFlags_NoResize;
             win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
             ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - 350), 
-                    main_viewport->GetWorkPos().y + 30), ImGuiCond_Always);
+            ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - 500), 
+                    main_viewport->GetWorkPos().y + 50), ImGuiCond_Once);
 
             if (startMenu(title, win_flags)) {
                 ImGui::Text("%s", text.c_str());
@@ -222,7 +310,13 @@ namespace viewpoint_interface
 
                             int item_ix = getItemIndexInVector(displays.getDisplayId(i), primary_displays);
                             if (item_ix != -1) {
-                                toNextPrimaryDisplay(item_ix);
+                                toNextDisplay(item_ix, LayoutDisplayRole::Primary);
+                            }
+                            else {
+                                item_ix = getItemIndexInVector(displays.getDisplayId(i), secondary_displays);
+                                if (item_ix != -1) {
+                                    toNextDisplay(item_ix, LayoutDisplayRole::Secondary);
+                                }
                             }
                         }
                     }
@@ -234,31 +328,51 @@ namespace viewpoint_interface
             ImGui::Separator();
         }
 
-        virtual void drawPrimaryDisplaySelector(uint num)
+        virtual void drawDisplaySelector(uint num, std::string title="", 
+                LayoutDisplayRole role=LayoutDisplayRole::Primary)
         {
-            if (!hasPrimaryDisplays()) {
+            std::vector<uint> &role_vec(getDisplaysVectorFromRole(role));
+            std::string label(title);
+            switch (role)
+            {
+                case LayoutDisplayRole::Primary:
+                {
+                    if (title.compare("") == 0) {
+                        label = "Primary Display " + num;
+                    }
+                }   break;
+
+                case LayoutDisplayRole::Secondary:
+                {
+                    if (title.compare("") == 0) {
+                        label = "Secondary Display " + num;
+                    }
+                }   break;
+            }
+
+            if (role_vec.size() <= num) {
                 return;
             }
 
             static ImGuiComboFlags flags = 0;
             flags |= ImGuiComboFlags_PopupAlignLeft;
 
-            std::string combo_label = displays.getDisplayInternalName(displays.getDisplayIxById(primary_displays.at(num)));
-            if (ImGui::BeginCombo("Primary Display", combo_label.c_str(), flags))
+            std::string preview = displays.getDisplayInternalNameById(role_vec.at(num));
+            if (ImGui::BeginCombo(label.c_str(), preview.c_str(), flags))
             {
                 int cur_ix = -1;
                 for (int i = 0; i < displays.getNumActiveDisplays(); i++)
                 {
                     cur_ix = displays.getNextActiveDisplayIx(cur_ix);
 
-                    const bool is_primary = (displays.getDisplayId(cur_ix) == primary_displays[num]);
+                    const bool in_vec = (displays.getDisplayId(cur_ix) == role_vec.at(num));
                     std::string disp_name = displays.getDisplayInternalName(cur_ix);
-                    if (ImGui::Selectable(disp_name.c_str(), is_primary)) {
-                        primary_displays[num] = displays.getDisplayId(cur_ix);
+                    if (ImGui::Selectable(disp_name.c_str(), in_vec)) {
+                        role_vec[num] = displays.getDisplayId(cur_ix);
                     }
 
                     // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                    if (is_primary) {
+                    if (in_vec) {
                         ImGui::SetItemDefaultFocus();
                     }
                 }
@@ -278,9 +392,14 @@ namespace viewpoint_interface
                     }
 
                     if (isItemInVector(displays.getDisplayId(i), primary_displays)) {
-                        enablePrimaryDisplayStyle();
+                        enableDisplayStyle(LayoutDisplayRole::Primary);
                         ImGui::Selectable(displays.getDisplayInternalName(i).c_str(), true);
-                        disablePrimaryDisplayStyle();
+                        disableDisplayStyle();
+                    }
+                    else if(isItemInVector(displays.getDisplayId(i), secondary_displays)) {
+                        enableDisplayStyle(LayoutDisplayRole::Secondary);
+                        ImGui::Selectable(displays.getDisplayInternalName(i).c_str(), true);
+                        disableDisplayStyle();
                     }
                     else {
                         ImGui::Selectable(displays.getDisplayInternalName(i).c_str());
@@ -301,6 +420,25 @@ namespace viewpoint_interface
             
         }
 
+        virtual void displayPiPWindow(float width, float height, uint pip_id)
+        {
+            std::string title = displays.getDisplayExternalName(secondary_displays.at(0));
+            ImGuiWindowFlags win_flags = 0;
+            win_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
+            win_flags |= ImGuiWindowFlags_NoTitleBar;
+            // win_flags |= ImGuiWindowFlags_NoBackground;
+            win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+            ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - width-150), 
+                    main_viewport->GetWorkPos().y + (main_viewport->GetWorkSize().y - height-150)), ImGuiCond_Once);
+
+            if (startMenu("Picture-in-Picture", win_flags)) {
+                ImGui::Text("%s", title.c_str());
+                ImGui::Image((ImTextureID)pip_id, ImVec2(width, height));
+                endMenu();
+            }
+        }
+
         virtual void drawCarouselMenu() const
         {
 
@@ -313,7 +451,24 @@ namespace viewpoint_interface
         };
 
         LayoutType layout_type;
-        bool has_primary;
+
+        std::vector<uint> &getDisplaysVectorFromRole(LayoutDisplayRole role)
+        {
+            switch (role)
+            {
+                case LayoutDisplayRole::Primary:
+                {
+                    return primary_displays;
+                }   break;
+
+                case LayoutDisplayRole::Secondary:
+                {
+                    return secondary_displays;
+                }   break;
+            }
+
+            return primary_displays;
+        }
     };
     
 
@@ -330,13 +485,17 @@ namespace viewpoint_interface
         }
 
         virtual void draw() override {}
+
+        virtual void handleImageResponse() override {}
     };
 
 
     struct PilotParams
     {
         uint start_primary_display = 0;
+        uint start_pip_display = 1;
         uint max_num_displays = 3;
+        glm::vec2 pip_window_dims = glm::vec2{350.0, 200.0};
     };
 
     class PilotLayout : public Layout
@@ -349,9 +508,8 @@ namespace viewpoint_interface
                 parameters.max_num_displays = displays.size();
             }
 
-            
-
             primary_displays.push_back(displays.getDisplayId(parameters.start_primary_display));
+            secondary_displays.push_back(displays.getDisplayId(parameters.start_pip_display));
         }
 
         virtual void displayLayoutParams() override
@@ -364,18 +522,54 @@ namespace viewpoint_interface
 
             drawDraggableRing();
 
-            drawPrimaryDisplaySelector(0);
+            drawDisplaySelector(0, "Main Camera", LayoutDisplayRole::Primary);
+            drawDisplaySelector(0, "Pic-in-Pic Camera", LayoutDisplayRole::Secondary);
         }
 
         virtual void draw() override
         {
+            handleImageResponse();
+
             std::string instr_text = "Instructions:";
             displayInstructionsWindow(instr_text);
+            glm::uvec2 pip_dims = parameters.pip_window_dims;
+            displayPiPWindow(pip_dims.x, pip_dims.y, pip_id);
+
+            // We only have one primary and one Pic-in-pic display
+            std::vector<uchar> &prim_data = displays.getDisplayDataById(primary_displays.at(0));
+            const DisplayInfo &prim_info(displays.getDisplayInfoById(primary_displays.at(0)));
+            addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
+                    prim_data, 0, LayoutDisplayRole::Primary});
+
+            std::vector<uchar> &sec_data = displays.getDisplayDataById(secondary_displays[0]);
+            const DisplayInfo &sec_info(displays.getDisplayInfoById(primary_displays.at(0)));
+            addImageRequestToQueue(DisplayImageRequest{sec_info.dimensions.width, sec_info.dimensions.height, 
+                    sec_data, 0, LayoutDisplayRole::Secondary});
         }
 
+        virtual void handleImageResponse() override
+        {
+            for (int i = 0; i < image_response_queue.size(); i++) {
+                DisplayImageResponse &response(image_response_queue.at(i));
+
+                switch (response.role)
+                {
+                    case LayoutDisplayRole::Primary:
+                    {
+                        prim_id = response.id;
+                    }   break;
+
+                    case LayoutDisplayRole::Secondary:
+                    {
+                        pip_id = response.id;
+                    }   break;
+                }
+            }
+        }
 
     private:
         PilotParams parameters;
+        uint prim_id, pip_id;
     };
 
 
@@ -417,10 +611,15 @@ namespace viewpoint_interface
 
             drawDraggableRing();
 
-            drawPrimaryDisplaySelector(0);
+            drawDisplaySelector(0);
         }
 
         virtual void draw() override
+        {
+
+        }
+
+        virtual void handleImageResponse() override
         {
 
         }
@@ -445,6 +644,11 @@ namespace viewpoint_interface
             
         }
 
+        virtual void handleImageResponse() override
+        {
+            
+        }
+
     };
 
     class PipLayout : public Layout
@@ -458,6 +662,11 @@ namespace viewpoint_interface
         }
 
         virtual void draw() override
+        {
+            
+        }
+
+        virtual void handleImageResponse() override
         {
             
         }
@@ -479,6 +688,11 @@ namespace viewpoint_interface
             
         }
 
+        virtual void handleImageResponse() override
+        {
+            
+        }
+
     };
 
 
@@ -487,7 +701,7 @@ namespace viewpoint_interface
     public:
         const std::string cp_title = "Layouts Control Panel";
 
-        LayoutManager() : active_layout(new NoneLayout(displays)) {}
+        LayoutManager() : active_layout(new NoneLayout(displays)), previous_layout(active_layout) {}
 
 
         // TODO: Add function to draw layout windows
@@ -495,7 +709,9 @@ namespace viewpoint_interface
 
         void draw()
         {
-            // if control_panel_active
+            previous_layout = active_layout;
+
+            // TODO: if control_panel_active
             ImGuiWindowFlags win_flags = 0;
             win_flags |= ImGuiWindowFlags_NoScrollbar;
             win_flags |= ImGuiWindowFlags_NoResize;
@@ -530,9 +746,29 @@ namespace viewpoint_interface
             displays.copyImageToDisplay(ix, image);
         }
 
+        bool wasLayoutChanged() const
+        {
+            return previous_layout->getLayoutType() != active_layout->getLayoutType();
+        }
+
+        std::vector<DisplayImageRequest>& getImageRequestQueue()
+        {
+            return active_layout->getImageRequestQueue();
+        }
+
+        void pushImageResponse(const DisplayImageResponse &response)
+        {
+            // Skip responses since they may no longer apply to new layout
+            if (wasLayoutChanged()) {
+                return;
+            }
+
+            active_layout->pushImageResponse(response);
+        }
 
     private:
         std::shared_ptr<Layout> active_layout;
+        std::shared_ptr<Layout> previous_layout;
         DisplayManager displays;
 
         std::vector<std::shared_ptr<Layout>> layouts_cache;
@@ -692,6 +928,7 @@ namespace viewpoint_interface
             }
 
             if (!isLayoutActive(LayoutType::NONE)) {
+                ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
                 ImGui::Text("Parameters for %s:", active_layout->getLayoutName().c_str());
             }
             ImGui::Spacing();

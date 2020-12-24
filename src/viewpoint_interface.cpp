@@ -44,61 +44,17 @@ int main(int argc, char *argv[])
 {   
     ros::init(argc, argv, "viewpoint_interface");
 
+    // Change working directory so we can specify resources more easily
+    // NOTE: This depends on the 'cwd' param of the launch file being set to "node"
+    chdir("../../../src/camera_viewpoint_interface");
+
     App app = App();
     app.run(argc, argv);
     
     return 0;
 }
 
-// -- Helper functions --
 
-
-// void mismatchDisplays(uint &disp1, uint &disp2, uint size)
-// {
-//     if (disp1 == disp2) {
-//         disp2 = getNextIndex(disp2, size);
-//     }
-// }
-
-// void nextDisplay(uint &disp1, uint &disp2, uint size, bool bump)
-// {
-//     if (size < 2) {
-//         disp1 = disp2 = 0;
-//     }
-//
-//     if (bump) {
-//         disp1 = getNextIndex(disp1, size);
-//         mismatchDisplays(disp1, disp2, size);
-//     }
-//     else {
-//         uint next_disp = getNextIndex(disp1, size);
-//         if (next_disp == disp2) {
-//             next_disp = getNextIndex(next_disp, size);
-//         }
-//
-//         disp1 = next_disp;
-//     }
-// }
-
-// void previousDisplay(uint &disp1, uint &disp2, uint size, bool bump)
-// {
-//     if (size < 2) {
-//         disp1 = disp2 = 0;
-//     }
-//
-//     if (bump) {
-//         disp1 = getPreviousIndex(disp1, size);
-//         mismatchDisplays(disp1, disp2, size);
-//     }
-//     else {
-//         uint next_disp = getPreviousIndex(disp1, size);
-//         if (next_disp == disp2) {
-//             next_disp = getPreviousIndex(next_disp, size);
-//         }
-//
-//         disp1 = next_disp;
-//     }
-// }
 
 bool App::parseCameraFile()
 {
@@ -147,8 +103,6 @@ bool App::parseCameraFile()
 
         layouts.addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
     }
-
-    out_img = Image(max_width, max_height, max_channels);
 
     return true;
 }
@@ -265,25 +219,24 @@ void App::initializeImGui()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     ImGui::StyleColorsDark();
 
     ImGuiStyle& style = ImGui::GetStyle();
     style.ItemInnerSpacing = ImVec2(7.0, 2.0);
     style.WindowRounding = 6.0;
-    // if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-    //     style.WindowRounding = 0.0f;
-    //     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    // }
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
+
+    if (!io.Fonts->AddFontFromFileTTF("resources/fonts/Ubuntu-Regular.ttf", 18.0f)) {
+        printText("Could not load font.");
+    }
 }
 
 void App::shutdownApp()
 {
-    // Triggers when we're shutting down b/c window was closed
+    // Triggers when we're shutting down due to window being closed
     if (ros::ok()) {
         ros::shutdown();
     }
@@ -421,18 +374,29 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
             } break;
         }
     }
-
-
-    // else if (key == GLFW_KEY_C && action == GLFW_PRESS) {
-    //     clutch_mode = !clutch_mode;
-    // }
-    // else if (key == GLFW_KEY_P && action == GLFW_PRESS) {
-    //     // TODO: Enable PiP
-    // }
+    else
+    {
+        layouts.handleKeyInput(key, action, mods);
+    }
 }
 
 
-// -- OpenGL and Dear ImGui --
+// -- Display image handling --
+
+uint generateGLTextureId()
+{
+    uint id;
+    glGenTextures(1, &id);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, id);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+    return id;
+}
+
 void Image::generateEmptyTexture(uint tex_num)
 {
     glGenTextures(1, &id);
@@ -445,32 +409,49 @@ void Image::generateEmptyTexture(uint tex_num)
     glActiveTexture(GL_TEXTURE0);
 }
 
-void App::updateOutputImage()
-{   
-    glActiveTexture(0);
-    glBindTexture(GL_TEXTURE_2D, 1); // TODO: ID should be a variable
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, out_img.width, out_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, 
-            (GLvoid*)layouts.getDisplayInfo(1).data.data());
-}
+void App::handleDisplayImageQueue()
+{
+    static std::vector<uint> tex_ids;
 
-// void App::updatePipImage()
-// {
-//     DDisplay cur_disp = disp_info.at(pip_display);
-//     uint disp_size = cur_disp.image.size;
-//
-//     if (disp_size != out_img.size) {
-//         // TODO: Figure out how to deal with different sizes
-//     }
-//
-//     cv::Mat flip_mat = cv::Mat(cur_disp.image.width, cur_disp.image.height, CV_8UC3, cur_disp.image.data.data());
-//     cv::flip(flip_mat, flip_mat, 0);
-//
-//     pip_img.resize(cur_disp.image.width, cur_disp.image.height, cur_disp.image.channels);
-//     pip_img.copy_data(flip_mat);
-//     glActiveTexture(2);
-//     glBindTexture(GL_TEXTURE_2D, pip_img.id);
-//     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, pip_img.width, pip_img.height, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)pip_img.data.data());
-// }
+    std::vector<DisplayImageRequest> &queue = layouts.getImageRequestQueue();
+
+    if (layouts.wasLayoutChanged()) {
+        queue.clear();
+        return;
+    }
+
+    if (queue.size() > tex_ids.size()) {
+        for (uint i = tex_ids.size(); i < queue.size(); i++) {
+            uint new_id = generateGLTextureId();
+            tex_ids.push_back(new_id);
+        }
+    }
+
+    for (int i = 0; i < queue.size(); i++) {
+        DisplayImageRequest &request(queue.at(i));
+        uint cur_id = tex_ids.at(i);
+
+        int width, height, x, y;
+        if (request.width == 0.0 || request.height == 0.0) {
+            glfwGetFramebufferSize(window, &width, &height);
+            transformFramebufferDims(&x, &y, &width, &height);
+        }
+        else {
+            width = request.width;
+            height = request.height;
+        }
+
+        glActiveTexture(0);
+        glBindTexture(GL_TEXTURE_2D, cur_id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE,
+                (GLvoid*)request.data.data());
+
+
+        layouts.pushImageResponse(DisplayImageResponse{cur_id, request.index, request.role});
+    }
+
+    queue.clear();
+}
 
 MMesh generateSquare()
 {
@@ -514,81 +495,6 @@ MMesh generateSquare()
     return mesh;
 }
 
-void App::buildMenu(std::string title, void (App::*build_func)(void), ImGuiWindowFlags window_flags)
-{
-
-    if (!ImGui::Begin(title.c_str(), (bool *)NULL, window_flags)) {
-        ImGui::End();
-        return;    
-    }
-
-    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.35f);
-    (this->*build_func)();
-    ImGui::PopItemWidth();
-    ImGui::End();
-}
-
-// void App::buildDisplaySelectors()
-// {
-//     const char *disp_preview = disp_info.at(active_display).name.c_str(); 
-//     if (ImGui::BeginCombo("Primary", disp_preview, ImGuiComboFlags_None))
-//     {
-//         for (int n = 0; n < disp_info.size(); n++)
-//         {
-//             const char *cam_name = disp_info.at(n).name.c_str();
-//             const bool is_selected = (active_display == n);
-//             if (ImGui::Selectable(cam_name, is_selected)) {
-//                 active_display = n;
-//             }
-
-//             // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-//             if (is_selected) {
-//                 ImGui::SetItemDefaultFocus();
-//             }
-//         }
-
-//         ImGui::EndCombo();
-//     }
-
-//     // mismatchDisplays(active_display, pip_display, disp_info.size());
-
-//     if (disp_info.size() > 1) {
-//         ImGui::Checkbox("Pic-in-Pic Enabled", &pip_enabled);
-//         if (pip_enabled) {
-//             const char *pip_preview = pip_preview = disp_info.at(pip_display).name.c_str(); 
-//             if (ImGui::BeginCombo("Pic-in-Pic", pip_preview, ImGuiComboFlags_None))
-//             {
-//                 for (int n = 0; n < disp_info.size(); n++)
-//                 {
-//                     // Skip currently active main display
-//                     if (active_display == n) {
-//                         continue;
-//                     }
-
-//                     const char *cam_name = disp_info.at(n).name.c_str();
-//                     const bool is_selected = (pip_display == n);
-//                     if (ImGui::Selectable(cam_name, is_selected)) {
-//                         pip_display = n;
-//                     }
-
-//                     // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-//                     if (is_selected) {
-//                         ImGui::SetItemDefaultFocus();
-//                     }
-//                 }
-
-//                 ImGui::EndCombo();
-//             }
-//         }
-//     }
-// }
-
-void App::buildPiPWindow()
-{
-    ImTextureID img_id = (ImTextureID)(pip_img.id);
-    ImGui::Image(img_id, ImVec2(app_params.pip_width, app_params.pip_height));
-}
-
 
 // -- ROS Callbacks --
 
@@ -612,38 +518,25 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
 
 int App::run(int argc, char *argv[])
 {
-    // Change working directory so we can specify resources more easily
-    // NOTE: This depends on the 'cwd' param of the launch file being set to "node"
-    chdir("../../../src/camera_viewpoint_interface");
-
     if (!initialize(argc, argv)) {
         return -1;
     }
 
-    // TODO: 
-    // Create a pool with full set of displays (max 9)
-    // For now, choose 1024*1024*3 bytes
-    // Anytime that a display is activated, just start piping data
-    // to the appropriate display slot
-
     // Set up display textures
-    MMesh img_surface = generateSquare();
-    out_img.generateEmptyTexture(1);
+    // MMesh img_surface = generateSquare();
+    // out_img.generateEmptyTexture(1);
 
-    uint overlay = TextureFromFile("clutch_mode_overlay.png", "resources/textures/");
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, overlay);
+    // uint overlay = TextureFromFile("clutch_mode_overlay.png", "resources/textures/");
+    // glActiveTexture(GL_TEXTURE2);
+    // glBindTexture(GL_TEXTURE_2D, overlay);
     
-    // pip_img = Image();
-    // pip_img.generateEmptyTexture(3);
-
     // -- Set up shaders --
-    std::string base_path("resources/shaders/");
+    // std::string base_path("resources/shaders/");
 
-    Shader bg_shader((base_path + "bg_shader.vert").c_str(), (base_path + "bg_shader.frag").c_str());
-    bg_shader.use();
-    bg_shader.setInt("Texture", 1);
-    bg_shader.setInt("Overlay", 2);
+    // Shader bg_shader((base_path + "bg_shader.vert").c_str(), (base_path + "bg_shader.frag").c_str());
+    // bg_shader.use();
+    // bg_shader.setInt("Texture", 1);
+    // bg_shader.setInt("Overlay", 2);
     // ----
 
 
@@ -656,7 +549,6 @@ int App::run(int argc, char *argv[])
     {
         glfwPollEvents();
 
-        // --- Build ImGui windows
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -665,56 +557,22 @@ int App::run(int argc, char *argv[])
 
         layouts.draw();
         
-        // ImGuiWindowFlags win_flags = 0;
-        // win_flags |= ImGuiWindowFlags_NoScrollbar;
-        // win_flags |= ImGuiWindowFlags_NoResize;
-        // buildMenu("Displays", &App::buildDisplaySelectors, win_flags);
+        handleDisplayImageQueue();
 
-
-        // if (pip_enabled) {
-        //     win_flags = 0;
-        //     win_flags |= ImGuiWindowFlags_NoScrollbar;
-        //     win_flags |= ImGuiWindowFlags_NoResize;
-        //     win_flags |= ImGuiWindowFlags_NoCollapse;
-        //     win_flags |= ImGuiWindowFlags_NoSavedSettings;
-        //     ImGui::SetNextWindowSize(ImVec2(app_params.pip_width+15, app_params.pip_height+15), ImGuiCond_Once);
-        //     ImGui::SetNextWindowPos(ImVec2(app_params.WINDOW_WIDTH - app_params.pip_width-120, app_params.WINDOW_HEIGHT - app_params.pip_height-100));
-        //     DDisplay pip_disp = disp_info.at(pip_display);
-        //     std::string disp_name = pip_disp.display_name;
-        //     buildMenu(disp_name.c_str(), &App::buildPiPWindow, win_flags);
-        // }
-        // ---
-
-        updateOutputImage();
-
-        // if (pip_enabled) {
-        //     updatePipImage();
-        // }
-
-        bg_shader.setBool("overlay_on", clutch_mode);
+        // bg_shader.setBool("overlay_on", clutch_mode);
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glBindVertexArray(img_surface.VAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        // glBindVertexArray(img_surface.VAO);
+        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-        {
-            GLFWwindow* backup_current_context = glfwGetCurrentContext();
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
-            glfwMakeContextCurrent(backup_current_context);
-        }
-
         glfwSwapBuffers(window);
 
         // ImGui::EndFrame();
-
-        // ros::spinOnce();
 
         loop_rate.sleep();
     }

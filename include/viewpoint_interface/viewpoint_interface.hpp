@@ -158,9 +158,6 @@ namespace viewpoint_interface
         GLFWwindow* window;
         GLFWmonitor *monitor;
         ImGuiIO io;
-        Image out_img;
-        Image pip_img;
-
 
         // General program flow
         bool initialize(int argc, char *argv[]);
@@ -178,14 +175,7 @@ namespace viewpoint_interface
         void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index);
         static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);
         void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-        void updateOutputImage();
-        void updatePipImage();
-        
-        // Dear ImGui
-        void buildMenu(std::string title, void (App::*build_func)(void), ImGuiWindowFlags window_flags = 0);
-        void buildLayoutsMenu();
-        void buildDisplaySelectors();
-        void buildPiPWindow();
+        void handleDisplayImageQueue();
     };
 
 } // viewpoint_interface
@@ -194,6 +184,7 @@ void printText(std::string text="", int newlines=1, bool flush=false);
 
 void glfwErrorCallback(int code, const char* description);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
+uint generateGLTextureId();
 
 std::string getData(viewpoint_interface::Socket &sock);
 
