@@ -17,7 +17,8 @@ namespace viewpoint_interface
         uint height;
         uint channels;
 
-        DisplayDims(uint w, uint h, uint c) : int_size(w * h * c) {}
+        DisplayDims(uint w, uint h, uint c) : width(w), height(h), channels(c), 
+                int_size(w * h * c) {}
 
         inline uint size() const { return int_size; }
 
@@ -27,16 +28,16 @@ namespace viewpoint_interface
 
     struct DisplayInfo
     {
-        uint id;
-        std::string internal, external, topic;
         std::vector<uchar> data;
+        DisplayDims dimensions;
+        std::string internal, external, topic;
+        uint id;
 
-        DisplayInfo(std::string &int_name, std::string &ext_name, std::string &topic_name) : 
-                internal(int_name), external(ext_name), topic(topic_name) {}
-
-        void setDataSize(uint size)
+        DisplayInfo(std::string &int_name, std::string &ext_name, std::string &topic_name,
+                DisplayDims dims) : internal(int_name), external(ext_name), topic(topic_name),
+                dimensions(dims) 
         {
-            data.resize(size);
+            data.resize(dimensions.size());
         }
     };
 
@@ -46,24 +47,21 @@ namespace viewpoint_interface
     public:
 
         Display(std::string &internal, std::string &external, std::string &topic, const DisplayDims &dims) :
-                info(internal, external, topic), dimensions(dims), active(true)
+                info(internal, external, topic, dims), active(true)
         {
             info.id = getNextId();
-            info.setDataSize(dimensions.size());
         }
 
         inline uint getId() const { return info.id; }
         inline std::string getInternalName() const { return info.internal; }
         inline std::string getExternalName() const { return info.external; }
         inline std::string getTopicName() const { return info.topic; }
+        inline std::vector<uchar>& getData() { return info.data; }
         inline const DisplayInfo& getDisplayInfo() const { return info; }
-
-        const DisplayDims& dims() const { return dimensions; }
 
     private:
         bool active;
         DisplayInfo info;
-        DisplayDims dimensions;
 
         uint getNextId() 
         { 
@@ -152,9 +150,39 @@ namespace viewpoint_interface
             return displays[ix].getTopicName(); 
         }
 
+        std::vector<uchar>& getDisplayData(uint ix)
+        {
+            return displays[ix].getData();
+        }
+        
         const DisplayInfo& getDisplayInfo(uint ix) const
         { 
             return displays[ix].getDisplayInfo(); 
+        }
+
+        std::string getDisplayExternalNameById(uint id) const 
+        { 
+            return displays.at(getDisplayIxById(id)).getExternalName(); 
+        }
+
+        std::string getDisplayInternalNameById(uint id) const 
+        { 
+            return displays.at(getDisplayIxById(id)).getInternalName(); 
+        }
+
+        std::string getDisplayTopicNameById(uint id) const 
+        { 
+            return displays.at(getDisplayIxById(id)).getTopicName(); 
+        }
+
+        std::vector<uchar>& getDisplayDataById(uint id)
+        {
+            return displays.at(getDisplayIxById(id)).getData();
+        }
+
+        const DisplayInfo& getDisplayInfoById(uint id) const
+        { 
+            return displays.at(getDisplayIxById(id)).getDisplayInfo(); 
         }
 
         uint getNumActiveDisplays() const { return num_active_displays; }
