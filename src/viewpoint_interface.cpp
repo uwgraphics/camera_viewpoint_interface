@@ -368,6 +368,11 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
                 glfwSetWindowShouldClose(window, true);
             } break;
 
+            case GLFW_KEY_P:
+            {
+                layouts.toggleControlPanel();
+            } break;
+
             default:
             {
                 layouts.handleKeyInput(key, action, mods);
@@ -512,7 +517,12 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
         return;
     }
 
-    layouts.forwardImageForDisplayIx(index, cur_img->image);
+    // const cv::Mat &image = cur_img->image;
+    // cv::Mat unflipped_mat = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
+    cv::Mat unflipped_mat;
+    cv::flip(cur_img->image, unflipped_mat, 0);
+
+    layouts.forwardImageForDisplayIx(index, unflipped_mat);
 }
 
 
@@ -552,8 +562,6 @@ int App::run(int argc, char *argv[])
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-
-        ImGui::ShowDemoWindow();
 
         layouts.draw();
         

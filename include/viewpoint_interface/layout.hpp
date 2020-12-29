@@ -187,6 +187,7 @@ namespace viewpoint_interface
 
         std::vector<uint> primary_displays; // Stores display ID
         std::vector<uint> secondary_displays; // Stores display ID
+        std::vector<uint> prim_img_ids; // Stores OpenGL ID for primary images
 
         struct ColorSet
         {
@@ -239,6 +240,12 @@ namespace viewpoint_interface
             style.Colors[ImGuiCol_Header] = color_cache.base;
             style.Colors[ImGuiCol_HeaderHovered] = color_cache.hovered;
             style.Colors[ImGuiCol_HeaderActive] = color_cache.active;
+        }
+
+        void addPrimaryDisplay(uint id)
+        {
+            primary_displays.push_back(id);
+            prim_img_ids.resize(primary_displays.size());
         }
 
         void toNextDisplay(uint vec_ix, LayoutDisplayRole role)
@@ -420,6 +427,30 @@ namespace viewpoint_interface
             
         }
 
+        virtual void displayPrimaryWindows() {
+            // TODO: Figure out grid spacing when there are multiple primary displays
+
+            for (int i = 0; i < prim_img_ids.size(); i++) {
+                std::string title = displays.getDisplayExternalName(primary_displays.at(i));
+                ImGuiWindowFlags win_flags = 0;
+                win_flags |= ImGuiWindowFlags_NoDecoration;
+                win_flags |= ImGuiWindowFlags_NoSavedSettings;
+                win_flags |= ImGuiWindowFlags_NoMove;
+                win_flags |= ImGuiWindowFlags_NoBackground;
+                win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+                win_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus; // Otherwise, it overlays everything
+                ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+
+                // TODO: Update this for grid
+                ImGui::SetNextWindowPos(ImVec2(0.0, 0.0), ImGuiCond_Once);
+
+                if (startMenu(title, win_flags)) {
+                    ImGui::Image((ImTextureID)prim_img_ids.at(i), main_viewport->GetWorkSize());
+                    endMenu();
+                }
+            }
+        }
+
         virtual void displayPiPWindow(float width, float height, uint pip_id)
         {
             std::string title = displays.getDisplayExternalName(secondary_displays.at(0));
@@ -508,7 +539,7 @@ namespace viewpoint_interface
                 parameters.max_num_displays = displays.size();
             }
 
-            primary_displays.push_back(displays.getDisplayId(parameters.start_primary_display));
+            addPrimaryDisplay(displays.getDisplayId(parameters.start_primary_display));
             secondary_displays.push_back(displays.getDisplayId(parameters.start_pip_display));
         }
 
@@ -530,7 +561,9 @@ namespace viewpoint_interface
         {
             handleImageResponse();
 
-            std::string instr_text = "Instructions:";
+            displayPrimaryWindows();
+            std::string instr_text =    "Instructions:\n"
+                                        "Follow these instructions";
             displayInstructionsWindow(instr_text);
             glm::uvec2 pip_dims = parameters.pip_window_dims;
             displayPiPWindow(pip_dims.x, pip_dims.y, pip_id);
@@ -556,7 +589,7 @@ namespace viewpoint_interface
                 {
                     case LayoutDisplayRole::Primary:
                     {
-                        prim_id = response.id;
+                        prim_img_ids[response.index] = response.id;
                     }   break;
 
                     case LayoutDisplayRole::Secondary:
@@ -569,7 +602,7 @@ namespace viewpoint_interface
 
     private:
         PilotParams parameters;
-        uint prim_id, pip_id;
+        uint pip_id;
     };
 
 
@@ -703,25 +736,28 @@ namespace viewpoint_interface
 
         LayoutManager() : active_layout(new NoneLayout(displays)), previous_layout(active_layout) {}
 
-
-        // TODO: Add function to draw layout windows
-        // May need to pass OpenGL info about window size
+        void toggleControlPanel()
+        {
+            control_panel_active = !control_panel_active;
+        }
 
         void draw()
         {
             previous_layout = active_layout;
 
-            // TODO: if control_panel_active
-            ImGuiWindowFlags win_flags = 0;
-            win_flags |= ImGuiWindowFlags_NoScrollbar;
-            win_flags |= ImGuiWindowFlags_NoResize;
-            win_flags |= ImGuiWindowFlags_MenuBar;
-            win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
-            ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, main_viewport->GetWorkPos().y + 30), ImGuiCond_Always);
-            if (startMenu(cp_title, win_flags)) {
-                buildControlPanel();
-                endMenu();
+            if (control_panel_active)
+            {
+                ImGuiWindowFlags win_flags = 0;
+                win_flags |= ImGuiWindowFlags_NoScrollbar;
+                win_flags |= ImGuiWindowFlags_NoResize;
+                win_flags |= ImGuiWindowFlags_MenuBar;
+                win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+                ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+                ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, main_viewport->GetWorkPos().y + 30), ImGuiCond_Always);
+                if (startMenu(cp_title, win_flags)) {
+                    buildControlPanel();
+                    endMenu();
+                }
             }
 
             active_layout->draw();
@@ -770,6 +806,8 @@ namespace viewpoint_interface
         std::shared_ptr<Layout> active_layout;
         std::shared_ptr<Layout> previous_layout;
         DisplayManager displays;
+
+        bool control_panel_active = true;
 
         std::vector<std::shared_ptr<Layout>> layouts_cache;
         std::vector<LayoutType> excluded_layouts;
