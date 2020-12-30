@@ -1,5 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-   <node pkg="multicam_mimicry" type="multicam" name="multicam" 
-         output="screen" cwd="node"/>
-</launch>

@@ -1,18 +1,17 @@
 cmake_minimum_required(VERSION 3.12.4)
-project(multicam_mimicry)
+project(viewpoint_interface)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
+
+# set(CMAKE_BUILD_TYPE Debug)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS 
-  std_msgs 
   roscpp
   message_generation
-  geometry_msgs
-  relaxed_ik
   sensor_msgs
   cv_bridge
 )
@@ -89,7 +88,7 @@ find_package(OpenCV)
 catkin_package(
    INCLUDE_DIRS include
 #   LIBRARIES vectors
-   CATKIN_DEPENDS roscpp std_msgs relaxed_ik geometry_msgs
+   CATKIN_DEPENDS roscpp
 #  DEPENDS system_lib
 )
 
@@ -119,17 +118,18 @@ add_subdirectory(include/glfw)
 # add_executable(${PROJECT_NAME}_node src/openvr_ros_ws_node.cpp)
 
 add_compile_definitions(IMGUI_IMPL_OPENGL_LOADER_GLAD)
+add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 
-add_executable(multicam
-  src/multicam.cpp
+add_executable(viewpoint_interface
+  src/viewpoint_interface.cpp
   src/glad.c
   src/imgui.cpp
   src/imgui_demo.cpp
   src/imgui_draw.cpp
-  src/imgui_widgets.cpp
   src/imgui_tables.cpp
-  src/imgui_impl_opengl3.cpp
+  src/imgui_widgets.cpp
   src/imgui_impl_glfw.cpp
+  src/imgui_impl_opengl3.cpp
 )
 
 ## Rename C++ executable without prefix
@@ -141,11 +141,12 @@ add_executable(multicam
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(multicam ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(viewpoint_interface ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(multicam
+target_link_libraries(viewpoint_interface
   glfw
+  assimp
   dl
   ${OpenCV_LIBRARIES}
   ${catkin_LIBRARIES}
