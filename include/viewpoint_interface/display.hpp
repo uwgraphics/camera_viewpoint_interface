@@ -65,7 +65,7 @@ namespace viewpoint_interface
 
         uint getNextId() 
         { 
-            static uint current_id = 0;
+            static uint current_id = 100;
             return current_id++;
         }
 
@@ -242,8 +242,9 @@ namespace viewpoint_interface
             std::iter_swap(vec.begin() + ix1, vec.begin() + ix2);
         }
 
-        void copyImageToDisplay(uint ix, const cv::Mat &image)
+        void copyImageToDisplay(uint id, const cv::Mat &image)
         {
+            uint ix = getDisplayIxById(id);
             displays[ix].copyImage(image);
         }
 

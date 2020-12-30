@@ -242,7 +242,13 @@ namespace viewpoint_interface
             style.Colors[ImGuiCol_HeaderActive] = color_cache.active;
         }
 
-        void addPrimaryDisplay(uint id)
+        void addPrimaryDisplayByIx(uint ix)
+        {
+            uint id = displays.getDisplayId(ix);
+            addPrimaryDisplayById(id);
+        }
+
+        void addPrimaryDisplayById(uint id)
         {
             primary_displays.push_back(id);
             prim_img_ids.resize(primary_displays.size());
@@ -467,7 +473,7 @@ namespace viewpoint_interface
                     
                     // Show camera external name on top of image
                     ImGui::SetCursorPos({image_pos.x + 10, image_pos.y + 5});
-                    const std::string &title(displays.getDisplayExternalName(primary_displays.at(i)));
+                    const std::string &title(displays.getDisplayExternalNameById(primary_displays.at(i)));
                     ImGui::Text(title.c_str());
 
                     endMenu();
@@ -479,7 +485,7 @@ namespace viewpoint_interface
         {
             ImVec2 offset{150, 150};
 
-            std::string title = displays.getDisplayExternalName(secondary_displays.at(0));
+            std::string title = displays.getDisplayExternalNameById(secondary_displays.at(0));
             ImGuiWindowFlags win_flags = 0;
             win_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
             win_flags |= ImGuiWindowFlags_NoTitleBar;
@@ -566,7 +572,7 @@ namespace viewpoint_interface
                 parameters.max_num_displays = displays.size();
             }
 
-            addPrimaryDisplay(displays.getDisplayId(parameters.start_primary_display));
+            addPrimaryDisplayByIx(parameters.start_primary_display);
             secondary_displays.push_back(displays.getDisplayId(parameters.start_pip_display));
         }
 
@@ -577,7 +583,7 @@ namespace viewpoint_interface
             drawDisplaysList();
 
             ImGui::SliderInt("# Displays", (int *) &cur_num_displays, 1, parameters.max_num_displays);
-            
+
             drawDraggableRing();
 
             drawDisplaySelector(0, "Main Camera", LayoutDisplayRole::Primary);
@@ -586,31 +592,47 @@ namespace viewpoint_interface
             ImGui::Separator();
 
             ImGui::Text("Picture-in-Picture Settings:\n");
-            int start_pip_dims[2] = { parameters.pip_window_dims[0], parameters.pip_window_dims[1] }; 
-            bool pip_dims_changed = ImGui::DragInt2("Dimensions", parameters.pip_window_dims, 1.0f, 100, 600);
-            ImGui::Checkbox("Keep Aspect Ratio", &keep_aspect_ratio);
+            uint max_size = 600;
+            int start_pip_dims[2] = { parameters.pip_window_dims[0], parameters.pip_window_dims[1] };
+            bool pip_dims_changed = ImGui::DragInt2("Dimensions", parameters.pip_window_dims, 1.0f, 100, max_size);
+            bool ar_changed = ImGui::Checkbox("Keep Aspect Ratio", &keep_aspect_ratio);
 
             if (keep_aspect_ratio) {
-                ImGui::Text("Aspect Ratio %d:%d", parameters.pip_aspect_ratio[0], parameters.pip_aspect_ratio[1]);
-
-                if (pip_dims_changed) {
-                    float aspect_ratio = (float)parameters.pip_aspect_ratio[1] / parameters.pip_aspect_ratio[0];
-                    
-                    if (parameters.pip_window_dims[0]-start_pip_dims[0] != 0) {
-                        // Width changed
-                        parameters.pip_window_dims[1] = parameters.pip_window_dims[0] * aspect_ratio;
-                    }
-                    else {
-                        // Height changed
-                        aspect_ratio = 1.0 / aspect_ratio;
-                        parameters.pip_window_dims[0] = parameters.pip_window_dims[1] * aspect_ratio;
-                    }
-                }
-            }
-            else {
                 ImGui::Text("Aspect Ratio");
                 ImGui::SameLine();
-                ImGui::InputInt2("##PiP AR", parameters.pip_aspect_ratio);
+                ar_changed = ImGui::InputInt2("##PiP AR", parameters.pip_aspect_ratio) || ar_changed;
+
+                if (pip_dims_changed || ar_changed) {
+                    float aspect_ratio = (float)parameters.pip_aspect_ratio[0] / parameters.pip_aspect_ratio[1];
+                    
+                    // Clamp both axes to max_size
+                    int max_width(max_size), max_height(max_size);
+                    if (aspect_ratio > 1.0) {
+                        // Width is largest
+                        max_height = max_size * (1.0 / aspect_ratio);
+                    }
+                    else {
+                        // Height is largest or same
+                        max_width = max_size * aspect_ratio;
+                    }
+
+                    if (parameters.pip_window_dims[0] > max_width || 
+                            parameters.pip_window_dims[1] > max_height) {
+                        parameters.pip_window_dims[0] = max_width;
+                        parameters.pip_window_dims[1] = max_height;
+                    }
+                    else {
+                        if (parameters.pip_window_dims[1]-start_pip_dims[1] != 0) {
+                            // Height changed
+                            parameters.pip_window_dims[0] = parameters.pip_window_dims[1] * aspect_ratio;
+                        }
+                        else {
+                            // Width changed
+                            aspect_ratio = 1.0 / aspect_ratio;
+                            parameters.pip_window_dims[1] = parameters.pip_window_dims[0] * aspect_ratio;
+                        }
+                    }
+                }
             }
         }
 
@@ -619,6 +641,7 @@ namespace viewpoint_interface
             handleImageResponse();
 
             displayPrimaryWindows();
+
             std::string instr_text =    "Instructions:\n"
                                         "Follow these instructions";
             displayInstructionsWindow(instr_text);
@@ -837,9 +860,9 @@ namespace viewpoint_interface
 
         uint getNumTotalDisplays() const { return displays.getNumTotalDisplays(); }
 
-        void forwardImageForDisplayIx(uint ix, const cv::Mat &image)
+        void forwardImageForDisplayId(uint id, const cv::Mat &image)
         {
-            displays.copyImageToDisplay(ix, image);
+            displays.copyImageToDisplay(id, image);
         }
 
         bool wasLayoutChanged() const

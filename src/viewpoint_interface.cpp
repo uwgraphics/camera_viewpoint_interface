@@ -152,7 +152,7 @@ void App::initializeROS(int argc, char *argv[])
     
     for (int i = 0; i < layouts.getNumTotalDisplays(); i++) {
         ros::Subscriber disp_sub(n.subscribe<sensor_msgs::Image>(layouts.getDisplayInfo(i).topic, 10, 
-                boost::bind(&App::cameraImageCallback, this, _1, i)));
+                boost::bind(&App::cameraImageCallback, this, _1, layouts.getDisplayInfo(i).id)));
         disp_subs.push_back(disp_sub);
     }
 }
@@ -422,7 +422,6 @@ void App::handleDisplayImageQueue()
     std::vector<DisplayImageRequest> &queue = layouts.getImageRequestQueue();
 
     if (layouts.wasLayoutChanged()) {
-        queue.clear();
         return;
     }
 
@@ -504,7 +503,7 @@ MMesh generateSquare()
 
 // -- ROS Callbacks --
 
-void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
+void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id)
 {
     cv_bridge::CvImageConstPtr cur_img;
     try
@@ -518,12 +517,10 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index)
         return;
     }
 
-    // const cv::Mat &image = cur_img->image;
-    // cv::Mat unflipped_mat = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
     cv::Mat unflipped_mat;
     cv::flip(cur_img->image, unflipped_mat, 0);
 
-    layouts.forwardImageForDisplayIx(index, unflipped_mat);
+    layouts.forwardImageForDisplayId(id, unflipped_mat);
 }
 
 

@@ -172,7 +172,7 @@ namespace viewpoint_interface
         void parseControllerInput(std::string data);
         void handleRobotControl();
 
-        void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, int index);
+        void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint index);
         static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);
         void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
         void handleDisplayImageQueue();
