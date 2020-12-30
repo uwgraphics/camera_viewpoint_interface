@@ -289,8 +289,8 @@ namespace viewpoint_interface
             win_flags |= ImGuiWindowFlags_NoResize;
             win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
             ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - 500), 
-                    main_viewport->GetWorkPos().y + 50), ImGuiCond_Once);
+            ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - 600), 
+                    main_viewport->GetWorkPos().y + 50), ImGuiCond_Always);
 
             if (startMenu(title, win_flags)) {
                 ImGui::Text("%s", text.c_str());
@@ -428,44 +428,69 @@ namespace viewpoint_interface
         }
 
         virtual void displayPrimaryWindows() {
-            // TODO: Figure out grid spacing when there are multiple primary displays
-
             for (int i = 0; i < prim_img_ids.size(); i++) {
-                std::string title = displays.getDisplayExternalName(primary_displays.at(i));
                 ImGuiWindowFlags win_flags = 0;
                 win_flags |= ImGuiWindowFlags_NoDecoration;
+                win_flags |= ImGuiWindowFlags_NoInputs;
                 win_flags |= ImGuiWindowFlags_NoSavedSettings;
                 win_flags |= ImGuiWindowFlags_NoMove;
-                win_flags |= ImGuiWindowFlags_NoBackground;
-                win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
                 win_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus; // Otherwise, it overlays everything
                 ImGuiViewport* main_viewport = ImGui::GetMainViewport();
 
-                // TODO: Update this for grid
+                // TODO: Figure out grid spacing when there are multiple primary displays
                 ImGui::SetNextWindowPos(ImVec2(0.0, 0.0), ImGuiCond_Once);
+                ImGui::SetNextWindowSize(main_viewport->GetWorkSize());
 
-                if (startMenu(title, win_flags)) {
-                    ImGui::Image((ImTextureID)prim_img_ids.at(i), main_viewport->GetWorkSize());
+                // Maintain the right aspect ratio
+                const DisplayInfo &disp_info(displays.getDisplayInfoById(primary_displays.at(i)));
+                float aspect_ratio = (float)disp_info.dimensions.width / disp_info.dimensions.height;
+
+                ImVec2 image_dims = main_viewport->GetWorkSize();
+                ImVec2 padding{5, 5};
+
+                float img_width = image_dims.x - (2*padding.x);
+                float img_height = img_width * (1.0/aspect_ratio);
+
+                if (img_height > image_dims.y) {
+                    // Converted height is too large--convert width instead
+                    img_height = image_dims.y - (2*padding.y);
+                    img_width = img_height * aspect_ratio;
+                }
+
+                if (startMenu("Primary Display", win_flags)) {
+                    // Center the image on the window
+                    ImVec2 image_pos = ImVec2{(ImGui::GetWindowSize().x - img_width) * 0.5f, 
+                                              (ImGui::GetWindowSize().y - img_height) * 0.5f};
+                    ImGui::SetCursorPos(image_pos);
+
+                    ImGui::Image(reinterpret_cast<ImTextureID>(prim_img_ids.at(i)), ImVec2 {img_width, img_height});
+                    
+                    // Show camera external name on top of image
+                    ImGui::SetCursorPos({image_pos.x + 10, image_pos.y + 5});
+                    const std::string &title(displays.getDisplayExternalName(primary_displays.at(i)));
+                    ImGui::Text(title.c_str());
+
                     endMenu();
                 }
             }
         }
 
-        virtual void displayPiPWindow(float width, float height, uint pip_id)
+        virtual void displayPiPWindow(int width, int height, uint pip_id)
         {
+            ImVec2 offset{150, 150};
+
             std::string title = displays.getDisplayExternalName(secondary_displays.at(0));
             ImGuiWindowFlags win_flags = 0;
             win_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
             win_flags |= ImGuiWindowFlags_NoTitleBar;
-            // win_flags |= ImGuiWindowFlags_NoBackground;
             win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
             ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - width-150), 
-                    main_viewport->GetWorkPos().y + (main_viewport->GetWorkSize().y - height-150)), ImGuiCond_Once);
+            ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - width-offset.x), 
+                    main_viewport->GetWorkPos().y + (main_viewport->GetWorkSize().y - height-offset.y)), ImGuiCond_Always);
 
             if (startMenu("Picture-in-Picture", win_flags)) {
                 ImGui::Text("%s", title.c_str());
-                ImGui::Image((ImTextureID)pip_id, ImVec2(width, height));
+                ImGui::Image(reinterpret_cast<ImTextureID>(pip_id), ImVec2(width, height));
                 endMenu();
             }
         }
@@ -526,14 +551,16 @@ namespace viewpoint_interface
         uint start_primary_display = 0;
         uint start_pip_display = 1;
         uint max_num_displays = 3;
-        glm::vec2 pip_window_dims = glm::vec2{350.0, 200.0};
+
+        int pip_window_dims[2] = { 400, 225 };
+        int pip_aspect_ratio[2] = { 16, 9 };
     };
 
     class PilotLayout : public Layout
     {
     public:
         PilotLayout(DisplayManager &displays, PilotParams params=PilotParams()) : Layout(LayoutType::PILOT, displays),
-                parameters(params) 
+                parameters(params), keep_aspect_ratio(true)
         {
             if (parameters.max_num_displays > displays.size() || parameters.max_num_displays == 0) {
                 parameters.max_num_displays = displays.size();
@@ -550,11 +577,41 @@ namespace viewpoint_interface
             drawDisplaysList();
 
             ImGui::SliderInt("# Displays", (int *) &cur_num_displays, 1, parameters.max_num_displays);
-
+            
             drawDraggableRing();
 
             drawDisplaySelector(0, "Main Camera", LayoutDisplayRole::Primary);
             drawDisplaySelector(0, "Pic-in-Pic Camera", LayoutDisplayRole::Secondary);
+
+            ImGui::Separator();
+
+            ImGui::Text("Picture-in-Picture Settings:\n");
+            int start_pip_dims[2] = { parameters.pip_window_dims[0], parameters.pip_window_dims[1] }; 
+            bool pip_dims_changed = ImGui::DragInt2("Dimensions", parameters.pip_window_dims, 1.0f, 100, 600);
+            ImGui::Checkbox("Keep Aspect Ratio", &keep_aspect_ratio);
+
+            if (keep_aspect_ratio) {
+                ImGui::Text("Aspect Ratio %d:%d", parameters.pip_aspect_ratio[0], parameters.pip_aspect_ratio[1]);
+
+                if (pip_dims_changed) {
+                    float aspect_ratio = (float)parameters.pip_aspect_ratio[1] / parameters.pip_aspect_ratio[0];
+                    
+                    if (parameters.pip_window_dims[0]-start_pip_dims[0] != 0) {
+                        // Width changed
+                        parameters.pip_window_dims[1] = parameters.pip_window_dims[0] * aspect_ratio;
+                    }
+                    else {
+                        // Height changed
+                        aspect_ratio = 1.0 / aspect_ratio;
+                        parameters.pip_window_dims[0] = parameters.pip_window_dims[1] * aspect_ratio;
+                    }
+                }
+            }
+            else {
+                ImGui::Text("Aspect Ratio");
+                ImGui::SameLine();
+                ImGui::InputInt2("##PiP AR", parameters.pip_aspect_ratio);
+            }
         }
 
         virtual void draw() override
@@ -565,8 +622,8 @@ namespace viewpoint_interface
             std::string instr_text =    "Instructions:\n"
                                         "Follow these instructions";
             displayInstructionsWindow(instr_text);
-            glm::uvec2 pip_dims = parameters.pip_window_dims;
-            displayPiPWindow(pip_dims.x, pip_dims.y, pip_id);
+
+            displayPiPWindow(parameters.pip_window_dims[0], parameters.pip_window_dims[1], pip_id);
 
             // We only have one primary and one Pic-in-pic display
             std::vector<uchar> &prim_data = displays.getDisplayDataById(primary_displays.at(0));
@@ -602,7 +659,9 @@ namespace viewpoint_interface
 
     private:
         PilotParams parameters;
+        
         uint pip_id;
+        bool keep_aspect_ratio;
     };
 
 
@@ -753,7 +812,8 @@ namespace viewpoint_interface
                 win_flags |= ImGuiWindowFlags_MenuBar;
                 win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
                 ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-                ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, main_viewport->GetWorkPos().y + 30), ImGuiCond_Always);
+                ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, 
+                        main_viewport->GetWorkPos().y + 30), ImGuiCond_Once);
                 if (startMenu(cp_title, win_flags)) {
                     buildControlPanel();
                     endMenu();

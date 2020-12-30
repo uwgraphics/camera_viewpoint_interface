@@ -46,8 +46,8 @@ namespace viewpoint_interface
         uint pip_width = WINDOW_WIDTH * 0.25;
         uint pip_height = WINDOW_HEIGHT * 0.25;
 
-        uint def_disp_height = 1024;
-        uint def_disp_width = 1024;
+        uint def_disp_width = 1280;
+        uint def_disp_height = 720;
         uint def_disp_channels = 3;
         std::string cam_config_file = "resources/config/cam_config.json";
         const std::string CONTR_NAME = "vive_controller";

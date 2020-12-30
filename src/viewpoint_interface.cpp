@@ -207,6 +207,7 @@ bool App::initializeGlfw()
     glViewport(0, 0, frame_width, frame_height);
     glEnable(GL_DEPTH_TEST);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
+    glfwSetWindowSizeLimits(window, 800, 600, GLFW_DONT_CARE, GLFW_DONT_CARE);
     
     glfwSetWindowUserPointer(window, this);
     glfwSetKeyCallback(window, keyCallbackForwarding);
@@ -562,6 +563,8 @@ int App::run(int argc, char *argv[])
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+
+        ImGui::ShowDemoWindow();
 
         layouts.draw();
         
