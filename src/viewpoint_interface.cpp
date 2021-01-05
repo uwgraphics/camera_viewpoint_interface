@@ -77,29 +77,16 @@ bool App::parseCameraFile()
 
     json j = json::parse(config_data.str());
 
-    uint max_width = 0, max_height = 0, max_channels = 0;
-    uint num_cams = j["_num_cams"];
-    for (uint i = 0; i < num_cams; i++) {
-        std::string cam_id = "cam" + std::to_string(i);
+    for (json::iterator it = j.begin(); it != j.end(); it++) {
         std::string int_name, ext_name, topic_name;
         uint w, h, c;
 
-        int_name = j[cam_id]["internal_name"];
-        ext_name = j[cam_id]["external_name"];
-        topic_name = j[cam_id]["topic"];
-        w = j[cam_id]["width"];
-        h = j[cam_id]["height"];
-        c = j[cam_id]["channels"];
-
-        if (w > max_width) {
-            max_width = w;
-        }
-        if (h > max_height) {
-            max_height = h;
-        }
-        if (c > max_channels) {
-            max_channels = c;
-        }
+        int_name = (*it)["internal_name"];
+        ext_name = (*it)["external_name"];
+        topic_name = (*it)["topic"];
+        w = (*it)["width"];
+        h = (*it)["height"];
+        c = (*it)["channels"];
 
         layouts.addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
     }

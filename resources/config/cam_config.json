@@ -1,5 +1,4 @@
 {
-    "_num_cams": 5,
     "cam0": {
         "internal_name": "dynamic",
         "external_name": "Dynamic Camera",
