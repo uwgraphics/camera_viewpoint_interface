@@ -66,18 +66,29 @@ namespace viewpoint_interface
 
 
     // To add/change layouts follow the following steps:
-    // - Add/change enum entry for layout
+    // - Add/change enum entry in LayoutType for layout
     // - Edit num_layout_types and layout_names in Layout class
     // - Create/change subclass inheriting from Layout class
+    // - Implement virtual classes for layout, if necessary
     // - Add/change entry for layout in newLayout() function of LayoutManager
     enum LayoutType
     {
-        NONE = -1,
+        INACTIVE = -1,
         PILOT,
         STACK,
         GRID,
         PIP,
         CAROUSEL
+    };
+
+    enum LayoutCommand
+    {
+        INVALID_COMMAND,
+        PRIMARY_NEXT,
+        PRIMARY_PREV,
+        SECONDARY_NEXT,
+        SECONDARY_PREV,
+        PIP_TOGGLE
     };
 
     enum class LayoutDisplayRole
@@ -119,7 +130,7 @@ namespace viewpoint_interface
                 return (LayoutType)ix;
             }
 
-            return LayoutType::NONE;
+            return LayoutType::INACTIVE;
         }
 
         const std::vector<std::string> getLayoutList() const 
@@ -129,7 +140,7 @@ namespace viewpoint_interface
 
         const std::string getLayoutName() const
         {
-            if (layout_type == LayoutType::NONE) {
+            if (layout_type == LayoutType::INACTIVE) {
                 return "Layouts Inactive";
             }
 
@@ -177,6 +188,73 @@ namespace viewpoint_interface
                     {
                     } break;
                 }
+            }
+        }
+
+        /**
+         * This function is intended to serve as a universal translation table
+         * for all the layouts. Anytime that a new command is desired for a
+         * layout, a new entry should be added here and in the LayoutCommand
+         * enum. This makes it easier to manage all the commands available
+         * across layouts--preventing duplicates, serving as a reference, and
+         * providing a single point to add/change commands.
+         * 
+         * Params:
+         *      input - command string
+         * 
+         * Returns: command represented by input string. 
+         */
+        const LayoutCommand translateControllerInputToCommand(std::string input) const
+        {
+            if (input == "primary_next") {
+                return LayoutCommand::PRIMARY_NEXT;
+            }
+            else if (input == "primary_prev") {
+                return LayoutCommand::PRIMARY_PREV;
+            }
+            else if (input == "pip_next") {
+                return LayoutCommand::SECONDARY_NEXT;
+            }
+            else if (input == "pip_prev") {
+                return LayoutCommand::SECONDARY_PREV;
+            }
+            else if (input == "pip_toggle") {
+                return LayoutCommand::PIP_TOGGLE;
+            }
+
+            return LayoutCommand::INVALID_COMMAND;
+        }
+
+        virtual void handleControllerInput(std::string input)
+        {
+            LayoutCommand command(translateControllerInputToCommand(input));
+
+            switch(command)
+            {
+                case LayoutCommand::PRIMARY_NEXT:
+                {
+                    toNextDisplay(0, LayoutDisplayRole::Primary);
+                }   break;
+
+                case LayoutCommand::PRIMARY_PREV:
+                {
+                    toPrevDisplay(0, LayoutDisplayRole::Primary);
+                }   break;
+
+                case LayoutCommand::SECONDARY_NEXT:
+                {
+                    toNextDisplay(0, LayoutDisplayRole::Secondary);
+                }   break;
+
+                case LayoutCommand::SECONDARY_PREV:
+                {
+                    toPrevDisplay(0, LayoutDisplayRole::Secondary);
+                }   break;
+
+                default:
+                {
+
+                }   break;
             }
         }
 
@@ -492,7 +570,7 @@ namespace viewpoint_interface
             win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
             ImGuiViewport* main_viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - width-offset.x), 
-                    main_viewport->GetWorkPos().y + (main_viewport->GetWorkSize().y - height-offset.y)), ImGuiCond_Always);
+                    main_viewport->GetWorkPos().y + (main_viewport->GetWorkSize().y - height-offset.y)), ImGuiCond_Once);
 
             if (startMenu("Picture-in-Picture", win_flags)) {
                 ImGui::Text("%s", title.c_str());
@@ -534,10 +612,10 @@ namespace viewpoint_interface
     };
     
 
-    class NoneLayout : public Layout
+    class InactiveLayout : public Layout
     {
     public:
-        NoneLayout(DisplayManager &displays) : Layout(LayoutType::NONE, displays) {}
+        InactiveLayout(DisplayManager &displays) : Layout(LayoutType::INACTIVE, displays) {}
 
         virtual void displayLayoutParams() override
         {
@@ -566,7 +644,7 @@ namespace viewpoint_interface
     {
     public:
         PilotLayout(DisplayManager &displays, PilotParams params=PilotParams()) : Layout(LayoutType::PILOT, displays),
-                parameters(params), keep_aspect_ratio(true)
+                parameters(params), keep_aspect_ratio(true), pip_enabled(true)
         {
             if (parameters.max_num_displays > displays.size() || parameters.max_num_displays == 0) {
                 parameters.max_num_displays = displays.size();
@@ -640,24 +718,26 @@ namespace viewpoint_interface
         {
             handleImageResponse();
 
-            displayPrimaryWindows();
-
             std::string instr_text =    "Instructions:\n"
                                         "Follow these instructions";
             displayInstructionsWindow(instr_text);
 
-            displayPiPWindow(parameters.pip_window_dims[0], parameters.pip_window_dims[1], pip_id);
-
             // We only have one primary and one Pic-in-pic display
+            displayPrimaryWindows();
+
             std::vector<uchar> &prim_data = displays.getDisplayDataById(primary_displays.at(0));
             const DisplayInfo &prim_info(displays.getDisplayInfoById(primary_displays.at(0)));
             addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
                     prim_data, 0, LayoutDisplayRole::Primary});
 
-            std::vector<uchar> &sec_data = displays.getDisplayDataById(secondary_displays[0]);
-            const DisplayInfo &sec_info(displays.getDisplayInfoById(primary_displays.at(0)));
-            addImageRequestToQueue(DisplayImageRequest{sec_info.dimensions.width, sec_info.dimensions.height, 
-                    sec_data, 0, LayoutDisplayRole::Secondary});
+            if (pip_enabled) {
+                displayPiPWindow(parameters.pip_window_dims[0], parameters.pip_window_dims[1], pip_id);
+
+                std::vector<uchar> &sec_data = displays.getDisplayDataById(secondary_displays[0]);
+                const DisplayInfo &sec_info(displays.getDisplayInfoById(primary_displays.at(0)));
+                addImageRequestToQueue(DisplayImageRequest{sec_info.dimensions.width, sec_info.dimensions.height, 
+                        sec_data, 0, LayoutDisplayRole::Secondary});
+            }
         }
 
         virtual void handleImageResponse() override
@@ -680,11 +760,50 @@ namespace viewpoint_interface
             }
         }
 
+        virtual void handleControllerInput(std::string input)
+        {
+            LayoutCommand command(translateControllerInputToCommand(input));
+
+            switch(command)
+            {
+                case LayoutCommand::PRIMARY_NEXT:
+                {
+                    toNextDisplay(0, LayoutDisplayRole::Primary);
+                }   break;
+
+                case LayoutCommand::PRIMARY_PREV:
+                {
+                    toPrevDisplay(0, LayoutDisplayRole::Primary);
+                }   break;
+
+                case LayoutCommand::SECONDARY_NEXT:
+                {
+                    toNextDisplay(0, LayoutDisplayRole::Secondary);
+                }   break;
+
+                case LayoutCommand::SECONDARY_PREV:
+                {
+                    toPrevDisplay(0, LayoutDisplayRole::Secondary);
+                }   break;
+
+                case LayoutCommand::PIP_TOGGLE:
+                {
+                    pip_enabled = !pip_enabled;
+                }   break;
+
+                default:
+                {
+
+                }   break;
+            }
+        }
+
+
     private:
         PilotParams parameters;
         
         uint pip_id;
-        bool keep_aspect_ratio;
+        bool keep_aspect_ratio, pip_enabled;
     };
 
 
@@ -816,7 +935,7 @@ namespace viewpoint_interface
     public:
         const std::string cp_title = "Layouts Control Panel";
 
-        LayoutManager() : active_layout(new NoneLayout(displays)), previous_layout(active_layout) {}
+        LayoutManager() : active_layout(new InactiveLayout(displays)), previous_layout(active_layout) {}
 
         void toggleControlPanel()
         {
@@ -849,6 +968,11 @@ namespace viewpoint_interface
         void handleKeyInput(int key, int action, int mods)
         {
             active_layout->handleKeyInput(key, action, mods);
+        }
+
+        void handleControllerInput(std::string input)
+        {
+            active_layout->handleControllerInput(input);
         }
 
         void addDisplay(const Display &disp) { displays.addDisplay(disp); }
@@ -926,7 +1050,7 @@ namespace viewpoint_interface
 
                 default: 
                 {
-                    layout = std::shared_ptr<Layout>(new NoneLayout(displays));
+                    layout = std::shared_ptr<Layout>(new InactiveLayout(displays));
                 } break;
             }
             
@@ -994,11 +1118,11 @@ namespace viewpoint_interface
 
         std::shared_ptr<Layout> getLayoutFromCache(LayoutType type) const
         {
-            // LayoutManager is initialized with a NoneLayout, so it should always
+            // LayoutManager is initialized with an InactiveLayout, so it should always
             // should be the first layout in the cache
             std::shared_ptr<Layout> none_layout(layouts_cache[0]);
 
-            if (type == LayoutType::NONE) {
+            if (type == LayoutType::INACTIVE) {
                 return none_layout;
             }
 
@@ -1020,11 +1144,11 @@ namespace viewpoint_interface
                     bool selected;
                     bool inactivate = false;
 
-                    selected = isLayoutActive(LayoutType::NONE);
+                    selected = isLayoutActive(LayoutType::INACTIVE);
                     ImGui::MenuItem("Inactivate", NULL, &selected);
                     if (selected)
                     {
-                        activateLayout(LayoutType::NONE);
+                        activateLayout(LayoutType::INACTIVE);
                     }
 
                     for (int i = 0; i < layout_names.size(); i++) {
@@ -1048,7 +1172,7 @@ namespace viewpoint_interface
                 ImGui::EndMenuBar();
             }
 
-            if (!isLayoutActive(LayoutType::NONE)) {
+            if (!isLayoutActive(LayoutType::INACTIVE)) {
                 ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
                 ImGui::Text("Parameters for %s:", active_layout->getLayoutName().c_str());
             }

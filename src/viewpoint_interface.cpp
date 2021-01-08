@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 }
 
 
-
+// App init/shutdown
 bool App::parseCameraFile()
 {
     std::ifstream cam_file;
@@ -237,37 +237,104 @@ void App::shutdownApp()
 
 
 // Input handling
+void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_ESCAPE:
+            {
+                glfwSetWindowShouldClose(window, true);
+            } break;
+
+            case GLFW_KEY_P:
+            {
+                layouts.toggleControlPanel();
+            } break;
+
+            default:
+            {
+                layouts.handleKeyInput(key, action, mods);
+            } break;
+        }
+    }
+    else
+    {
+        layouts.handleKeyInput(key, action, mods);
+    }
+}
+
 std::string getSocketData(Socket &sock)
 {
     int len_data;
     len_data = recvfrom(sock.socket, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.address), &(sock.len)); 
-    while (len_data == -1 && ros::ok()) {
-        len_data = recvfrom(sock.socket, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.address), &(sock.len));   
-    }
+    // while (len_data == -1 && ros::ok()) {
+    //     len_data = recvfrom(sock.socket, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.address), &(sock.len));   
+    // }
     sock.buffer[len_data] = '\0';
     std::string data = sock.buffer;
 
     return data;
 }
 
-// TODO: No longer robot control--only handles controller input
-// void App::handleRobotControl()
-// {
-//     pollfd poll_fds;
-//     poll_fds.fd = sock.sock;
-//     poll_fds.events = POLLIN; // Wait until there's data to read
-//
-//     while (ros::ok() && !glfwWindowShouldClose(window))
-//     {
-//         if (poll(&poll_fds, 1, app_params.loop_rate) > 0) {
-//             std::string input_data = getSocketData(sock);
-//             parseControllerInput(input_data);
-//             printText(input.to_str(true));        
-//         }
-//     }
-//
-//     shutdown(sock.sock, SHUT_RDWR);
-// }
+const App::AppCommand App::translateControllerInputToCommand(std::string input) const
+{
+    if (input == "shutdown") {
+        return AppCommand::CLOSE_WINDOW;
+    }
+    else if (input == "toggle_control_panel") {
+        return AppCommand::TOGGLE_CONTROL_PANEL;
+    }
+
+    return AppCommand::NONE;
+}
+
+void App::parseControllerInput(std::string data)
+{
+    json j = json::parse(data);
+
+    if (j.is_null()) {
+        return;
+    }
+
+    for (json::iterator it = j.begin(); it != j.end(); it++) {
+        AppCommand command(translateControllerInputToCommand(it.key()));
+
+        switch (command)
+        {
+            case AppCommand::CLOSE_WINDOW:
+            {
+                glfwSetWindowShouldClose(window, true);                
+            }   break;
+
+            case AppCommand::TOGGLE_CONTROL_PANEL:
+            {
+                layouts.toggleControlPanel();
+            }   break;
+        
+            default:
+            {
+                layouts.handleControllerInput(it.key());
+            }   break;
+        }
+    }
+}
+
+void App::handleControllerInput()
+{
+    pollfd poll_fds;
+    poll_fds.fd = sock.socket;
+    poll_fds.events = POLLIN; // Wait until there's data to read
+
+    while (ros::ok() && !glfwWindowShouldClose(window))
+    {
+        if (poll(&poll_fds, 1, 1000.0/(float)app_params.loop_rate) > 0) {
+            std::string input_data = getSocketData(sock);
+            parseControllerInput(input_data);
+        }
+    }
+
+    shutdown(sock.socket, SHUT_RDWR);  
+}
 
 
 // -- Window handling --
@@ -298,35 +365,8 @@ void App::keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int a
     app->keyCallback(window, key, scancode, action, mods);
 }
 
-void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if (action == GLFW_PRESS) {
-        switch (key) {
-            case GLFW_KEY_ESCAPE:
-            {
-                glfwSetWindowShouldClose(window, true);
-            } break;
-
-            case GLFW_KEY_P:
-            {
-                layouts.toggleControlPanel();
-            } break;
-
-            default:
-            {
-                layouts.handleKeyInput(key, action, mods);
-            } break;
-        }
-    }
-    else
-    {
-        layouts.handleKeyInput(key, action, mods);
-    }
-}
-
 
 // -- Display image handling --
-
 uint generateGLTextureId()
 {
     uint id;
@@ -386,7 +426,6 @@ void App::handleDisplayImageQueue()
 
 
 // -- ROS Callbacks --
-
 void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id)
 {
     cv_bridge::CvImageConstPtr cur_img;
@@ -414,10 +453,6 @@ int App::run(int argc, char *argv[])
         return -1;
     }
 
-    // Set up display textures
-    // MMesh img_surface = generateSquare();
-    // out_img.generateEmptyTexture(1);
-
     // uint overlay = TextureFromFile("clutch_mode_overlay.png", "resources/textures/");
     // glActiveTexture(GL_TEXTURE2);
     // glBindTexture(GL_TEXTURE_2D, overlay);
@@ -432,9 +467,7 @@ int App::run(int argc, char *argv[])
     // ----
 
 
-    // Split robot control into its own thread to improve performance
-    // std::thread robot_control(&App::handleRobotControl, this);
-
+    std::thread controller_input(&App::handleControllerInput, this);
 
     ros::Rate loop_rate(app_params.loop_rate);
     while (ros::ok() && !glfwWindowShouldClose(window))
@@ -468,7 +501,8 @@ int App::run(int argc, char *argv[])
 
         loop_rate.sleep();
     }
-    // robot_control.join();
+
+    controller_input.join();
     shutdownApp();
 
     return 0;

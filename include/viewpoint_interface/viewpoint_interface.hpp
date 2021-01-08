@@ -83,6 +83,13 @@ namespace viewpoint_interface
         GLFWmonitor *monitor;
         ImGuiIO io;
 
+        enum AppCommand
+        {
+            NONE,
+            CLOSE_WINDOW,
+            TOGGLE_CONTROL_PANEL
+        };
+
         // General program flow
         bool initialize(int argc, char *argv[]);
         bool parseCameraFile();
@@ -93,12 +100,13 @@ namespace viewpoint_interface
         void shutdownApp();
 
         // Input handling
+        void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+        const AppCommand translateControllerInputToCommand(std::string input) const;
         void parseControllerInput(std::string data);
-        void handleRobotControl();
+        void handleControllerInput();
 
         void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint index);
         static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);
-        void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
         void handleDisplayImageQueue();
     };
 
@@ -110,7 +118,7 @@ void glfwErrorCallback(int code, const char* description);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 uint generateGLTextureId();
 
-std::string getData(viewpoint_interface::Socket &sock);
+std::string getSocketData(viewpoint_interface::Socket &sock);
 
 
 #endif // __VIEWPOINT_INTERFACE_HPP__
