@@ -32,8 +32,6 @@
 using json = nlohmann::json;
 using App = viewpoint_interface::App;
 using AppParams = viewpoint_interface::AppParams;
-using MMesh = viewpoint_interface::Mesh;
-using Image = viewpoint_interface::Image;
 using Socket = viewpoint_interface::Socket;
 
 
@@ -115,17 +113,17 @@ bool App::initialize(int argc, char *argv[])
 
 bool App::initializeSocket()
 {
-    if ((sock.sock = socket(AF_INET, SOCK_DGRAM, 0)) == 0) {
+    if ((sock.socket = socket(AF_INET, SOCK_DGRAM, 0)) == 0) {
         printText("Could not initialize socket.");
         return false;
     }
 
-    memset(&sock.addr, 0, sizeof(sock.addr));
-    sock.addr.sin_family = AF_INET; 
-    sock.addr.sin_addr.s_addr = INADDR_ANY;
-    sock.addr.sin_port = htons(sock.PORT);
+    memset(&sock.address, 0, sizeof(sock.address));
+    sock.address.sin_family = AF_INET; 
+    sock.address.sin_addr.s_addr = INADDR_ANY;
+    sock.address.sin_port = htons(sock.PORT);
 
-    if (bind(sock.sock, (const sockaddr *)&sock.addr, sizeof(sock.addr)) < 0) { 
+    if (bind(sock.socket, (const sockaddr *)&sock.address, sizeof(sock.address)) < 0) { 
         printText("Socket binding failed."); 
         return false;
     }
@@ -242,62 +240,15 @@ void App::shutdownApp()
 std::string getSocketData(Socket &sock)
 {
     int len_data;
-    len_data = recvfrom(sock.sock, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.addr), &(sock.len)); 
+    len_data = recvfrom(sock.socket, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.address), &(sock.len)); 
+    while (len_data == -1 && ros::ok()) {
+        len_data = recvfrom(sock.socket, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.address), &(sock.len));   
+    }
     sock.buffer[len_data] = '\0';
     std::string data = sock.buffer;
 
     return data;
 }
-
-// TODO: Change all robot control code
-// void App::parseControllerInput(std::string data)
-// {
-//     std::string CONTR_NAME = app_params.CONTR_NAME;
-//
-//     json j = json::parse(data);
-//
-//     input.clutching = j[CONTR_NAME]["clutch"]["boolean"];
-//
-//     input.manual_adj = j[CONTR_NAME]["manual_adj"]["boolean"];
-//     input.manual_offset.x = j[CONTR_NAME]["manual_adj"]["2d"]["x"];
-//     input.manual_offset.z = j[CONTR_NAME]["manual_adj"]["2d"]["y"];
-//
-//     if (!input.initialized) {
-//     }
-//
-//     // Handle clutching enabled by keyboard
-//     if (clutch_mode && !input.clutching.is_flipping() && !input.clutching.is_on()) {
-//         input.clutching.turn_on();
-//     }
-//
-//     if (input.clutching.is_flipping()) {
-//         if (input.clutching.is_on()) { // When just turned on
-//             clutch_mode = true;
-//             // TODO: Add orientation handling
-//         }
-//         else {
-//             clutch_mode = false;
-//         }
-//     }
-//
-//     if (input.manual_adj.confirm_flip_on()) {
-//         if (input.manual_offset.x >= 0.5) {
-//             nextDisplay(active_display, pip_display, disp_info.size());
-//         }
-//         else if (input.manual_offset.x <= -0.5) {
-//             previousDisplay(active_display, pip_display, disp_info.size());
-//         }
-//         else if (input.manual_offset.z >= 0.5) {
-//             nextDisplay(pip_display, active_display, disp_info.size(), false);
-//         }
-//         else if (input.manual_offset.z <= -0.5) {
-//             previousDisplay(pip_display, active_display, disp_info.size(), false);
-//         }
-//         else {
-//             pip_enabled = !pip_enabled;
-//         }
-//     }
-// }
 
 // TODO: No longer robot control--only handles controller input
 // void App::handleRobotControl()
@@ -390,18 +341,6 @@ uint generateGLTextureId()
     return id;
 }
 
-void Image::generateEmptyTexture(uint tex_num)
-{
-    glGenTextures(1, &id);
-    glActiveTexture(GL_TEXTURE0 + tex_num);
-    glBindTexture(GL_TEXTURE_2D, id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glActiveTexture(GL_TEXTURE0);
-}
-
 void App::handleDisplayImageQueue()
 {
     static std::vector<uint> tex_ids;
@@ -443,48 +382,6 @@ void App::handleDisplayImageQueue()
     }
 
     queue.clear();
-}
-
-MMesh generateSquare()
-{
-    float vertices[] = {
-        // positions          // colors           // texture coords
-         1.0f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
-         1.0f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f,   // bottom right
-        -1.0f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left
-        -1.0f,  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 1.0f    // top left 
-    };
-    unsigned int indices[] = {
-        0, 1, 3, // first triangle
-        1, 2, 3  // second triangle
-    };
-
-    MMesh mesh;
-
-    glGenVertexArrays(1, &mesh.VAO);
-    glGenBuffers(1, &mesh.VBO);
-    glGenBuffers(1, &mesh.EBO);
-
-    // Binds
-    glBindVertexArray(mesh.VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, mesh.VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    // Color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    // Texture coord attribute
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    
-    return mesh;
 }
 
 
@@ -548,7 +445,7 @@ int App::run(int argc, char *argv[])
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::ShowDemoWindow();
+        // ImGui::ShowDemoWindow();
 
         layouts.draw();
         
