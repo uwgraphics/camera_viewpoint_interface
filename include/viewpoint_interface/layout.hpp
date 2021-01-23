@@ -718,10 +718,6 @@ namespace viewpoint_interface
         {
             handleImageResponse();
 
-            std::string instr_text =    "Instructions:\n"
-                                        "Follow these instructions";
-            displayInstructionsWindow(instr_text);
-
             // We only have one primary and one Pic-in-pic display
             displayPrimaryWindows();
 
@@ -760,7 +756,43 @@ namespace viewpoint_interface
             }
         }
 
-        virtual void handleControllerInput(std::string input)
+        virtual void handleKeyInput(int key, int action, int mods) override
+        {
+            if (action == GLFW_PRESS) {
+                switch (key) {
+                    case GLFW_KEY_P:
+                    {
+                        pip_enabled = !pip_enabled;
+                    } break;
+
+                    case GLFW_KEY_RIGHT:
+                    {
+                        toNextDisplay(0, LayoutDisplayRole::Primary);
+                    } break;
+
+                    case GLFW_KEY_LEFT:
+                    {
+                        toPrevDisplay(0, LayoutDisplayRole::Primary);
+                    } break;
+
+                    case GLFW_KEY_UP:
+                    {
+                        toPrevDisplay(0, LayoutDisplayRole::Secondary);
+                    } break;
+
+                    case GLFW_KEY_DOWN:
+                    {
+                        toNextDisplay(0, LayoutDisplayRole::Secondary);
+                    } break;
+
+                    default:
+                    {
+                    } break;
+                }
+            }
+        }
+
+        virtual void handleControllerInput(std::string input) override
         {
             LayoutCommand command(translateControllerInputToCommand(input));
 

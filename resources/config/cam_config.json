@@ -3,40 +3,8 @@
         "internal_name": "dynamic",
         "external_name": "Dynamic Camera",
         "topic": "/cam/dyn_image",
-        "width": 1280,
-        "height": 720,
-        "channels": 3
-    },
-    "cam1": {
-        "internal_name": "static",
-        "external_name": "Static Camera",
-        "topic": "/cam/stat_image",
-        "width": 1280,
-        "height": 720,
-        "channels": 3
-    },
-    "cam2": {
-        "internal_name": "wide",
-        "external_name": "Wide Camera",
-        "topic": "/cam/wide_image",
-        "width": 1280,
-        "height": 720,
-        "channels": 3
-    },
-    "cam3": {
-        "internal_name": "cam4",
-        "external_name": "Camera4",
-        "topic": "/cam/camera4",
-        "width": 1280,
-        "height": 720,
-        "channels": 3
-    },
-    "cam4": {
-        "internal_name": "cam5",
-        "external_name": "Camera5",
-        "topic": "/cam/camera5",
-        "width": 1280,
-        "height": 720,
+        "width": 1024,
+        "height": 1024,
         "channels": 3
     }
 }

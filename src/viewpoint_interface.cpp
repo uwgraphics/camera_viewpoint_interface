@@ -246,7 +246,7 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
                 glfwSetWindowShouldClose(window, true);
             } break;
 
-            case GLFW_KEY_P:
+            case GLFW_KEY_C:
             {
                 layouts.toggleControlPanel();
             } break;
