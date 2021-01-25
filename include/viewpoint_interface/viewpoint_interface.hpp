@@ -76,6 +76,8 @@ namespace viewpoint_interface
         // ROS
         ros::NodeHandle n;
         ros::AsyncSpinner spinner;
+        ros::Subscriber grasper_sub;
+        ros::Subscriber clutching_sub;
         std::vector<ros::Subscriber> disp_subs;
 
         // GUI
@@ -106,6 +108,8 @@ namespace viewpoint_interface
         void handleControllerInput();
 
         void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint index);
+        void grasperCallback(const std_msgs::BoolConstPtr& msg);
+        void clutchingCallback(const std_msgs::BoolConstPtr& msg);
         static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);
         void handleDisplayImageQueue();
     };

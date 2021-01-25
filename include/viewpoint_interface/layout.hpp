@@ -1,6 +1,7 @@
 #ifndef __LAYOUT_HPP__
 #define __LAYOUT_HPP__
 
+#include <map>
 #include <string>
 #include <algorithm>
 
@@ -147,6 +148,9 @@ namespace viewpoint_interface
             return layout_names[(uint)layout_type];
         }
 
+        void setGrabbingState(bool state) { grabbing = state; }
+        void setClutchingState(bool state) { clutching = state; }
+
         std::vector<DisplayImageRequest>& getImageRequestQueue()
         {
             return display_image_queue;
@@ -263,6 +267,8 @@ namespace viewpoint_interface
         std::vector<DisplayImageRequest> display_image_queue;
         std::vector<DisplayImageResponse> image_response_queue;
 
+        bool grabbing, clutching;
+
         std::vector<uint> primary_displays; // Stores display ID
         std::vector<uint> secondary_displays; // Stores display ID
         std::vector<uint> prim_img_ids; // Stores OpenGL ID for primary images
@@ -275,6 +281,9 @@ namespace viewpoint_interface
         ColorSet color_cache;
         ColorSet primary_color;
         ColorSet secondary_color;
+
+        const ImVec4 on_color = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
+        const ImVec4 off_color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
 
         Layout(LayoutType type, DisplayManager &disp) : layout_type(type), displays(disp)
         {
@@ -378,6 +387,31 @@ namespace viewpoint_interface
 
             if (startMenu(title, win_flags)) {
                 ImGui::Text("%s", text.c_str());
+                endMenu();
+            }
+        }
+
+        void displayStateValues(std::map<std::string, bool> states) const
+        {
+            std::string title = "States";
+            ImGuiWindowFlags win_flags = 0;
+            win_flags |= ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs;
+            win_flags |= ImGuiWindowFlags_NoBackground;
+            win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+            ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - 300), 
+                    main_viewport->GetWorkPos().y + 50), ImGuiCond_Always);
+
+            if (startMenu(title, win_flags)) {
+                std::map<std::string, bool>::iterator itr;
+                for (itr = states.begin(); itr != states.end(); itr++) {
+                    ImGui::Text("%s: ", (itr->first).c_str());
+                    ImGui::SameLine();
+                    bool state(itr->second);
+                    ImVec4 state_color(state ? on_color : off_color);
+                    std::string state_val(state ? "on" : "off");
+                    ImGui::TextColored(state_color, state_val.c_str());
+                }
                 endMenu();
             }
         }
@@ -718,6 +752,11 @@ namespace viewpoint_interface
         {
             handleImageResponse();
 
+            std::map<std::string, bool> states;
+            states["Suction Pad"] = grabbing;
+            states["Clutching"] = clutching;
+            displayStateValues(states);
+
             // We only have one primary and one Pic-in-pic display
             displayPrimaryWindows();
 
@@ -968,6 +1007,9 @@ namespace viewpoint_interface
         const std::string cp_title = "Layouts Control Panel";
 
         LayoutManager() : active_layout(new InactiveLayout(displays)), previous_layout(active_layout) {}
+
+        void setGrabbingState(bool state) { active_layout->setGrabbingState(state); }
+        void setClutchingState(bool state) { active_layout->setClutchingState(state); }
 
         void toggleControlPanel()
         {

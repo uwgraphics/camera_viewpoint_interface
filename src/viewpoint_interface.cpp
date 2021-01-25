@@ -8,6 +8,7 @@
 // ROS
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
+#include <std_msgs/Bool.h>
 
 // OpenCV
 #include <opencv2/opencv.hpp>
@@ -140,6 +141,8 @@ void App::initializeROS(int argc, char *argv[])
                 boost::bind(&App::cameraImageCallback, this, _1, layouts.getDisplayInfo(i).id)));
         disp_subs.push_back(disp_sub);
     }
+    grasper_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/grasper_state", 10, boost::bind(&App::grasperCallback, this, _1));
+    clutching_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/clutching_state", 10, boost::bind(&App::clutchingCallback, this, _1));
 }
 
 bool App::initializeGlfw()
@@ -446,6 +449,15 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id)
     layouts.forwardImageForDisplayId(id, unflipped_mat);
 }
 
+void App::grasperCallback(const std_msgs::BoolConstPtr& msg)
+{
+    layouts.setGrabbingState(msg->data);
+}
+
+void App::clutchingCallback(const std_msgs::BoolConstPtr& msg)
+{
+    layouts.setClutchingState(msg->data);
+}
 
 int App::run(int argc, char *argv[])
 {
