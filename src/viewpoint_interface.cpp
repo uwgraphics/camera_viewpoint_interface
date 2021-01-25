@@ -171,7 +171,7 @@ bool App::initializeGlfw()
         win_height = app_params.WINDOW_HEIGHT;
     }
 
-    window = glfwCreateWindow(win_width, win_height, "Viewpoint Selection Interface", NULL, NULL);
+    window = glfwCreateWindow(win_width, win_height, "HRI Study", NULL, NULL);
     if (!window) {
         printText("Could not create window.");
         return false;
