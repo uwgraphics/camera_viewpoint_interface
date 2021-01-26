@@ -117,8 +117,8 @@ add_subdirectory(include/glfw)
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/openvr_ros_ws_node.cpp)
 
-add_compile_definitions(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
+add_definitions(-D IMGUI_IMPL_OPENGL_LOADER_GLAD)
+add_definitions(-D STB_IMAGE_IMPLEMENTATION)
 
 add_executable(viewpoint_interface
   src/viewpoint_interface.cpp
