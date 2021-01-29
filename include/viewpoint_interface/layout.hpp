@@ -409,7 +409,7 @@ namespace viewpoint_interface
                     ImGui::SameLine();
                     bool state(itr->second);
                     ImVec4 state_color(state ? on_color : off_color);
-                    std::string state_val(state ? "on" : "off");
+                    std::string state_val(state ? "ACTIVE" : "INACTIVE");
                     ImGui::TextColored(state_color, state_val.c_str());
                 }
                 endMenu();
@@ -753,8 +753,8 @@ namespace viewpoint_interface
             handleImageResponse();
 
             std::map<std::string, bool> states;
-            states["Suction Pad"] = grabbing;
-            states["Clutching"] = clutching;
+            states["Robot"] = !clutching;
+            states["Suction"] = grabbing;
             displayStateValues(states);
 
             // We only have one primary and one Pic-in-pic display
