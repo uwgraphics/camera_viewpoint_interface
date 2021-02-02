@@ -123,6 +123,7 @@ add_definitions(-D STB_IMAGE_IMPLEMENTATION)
 add_executable(viewpoint_interface
   src/viewpoint_interface.cpp
   src/timer.cpp
+  src/layout.cpp
   src/glad.c
   src/imgui.cpp
   src/imgui_demo.cpp
