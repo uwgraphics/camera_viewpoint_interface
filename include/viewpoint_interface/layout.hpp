@@ -7,7 +7,10 @@
 
 #include <glm/vec2.hpp>
 #include <imgui/imgui.h>
+
 #include "display.hpp"
+#include "timer.hpp"
+
 
 namespace viewpoint_interface
 {
@@ -678,7 +681,8 @@ namespace viewpoint_interface
     {
     public:
         PilotLayout(DisplayManager &displays, PilotParams params=PilotParams()) : Layout(LayoutType::PILOT, displays),
-                parameters(params), keep_aspect_ratio(true), pip_enabled(true)
+                parameters(params), keep_aspect_ratio(true), pip_enabled(true), 
+                countdown(5, Timer::DurationType::SECONDS)
         {
             if (parameters.max_num_displays > displays.size() || parameters.max_num_displays == 0) {
                 parameters.max_num_displays = displays.size();
@@ -702,6 +706,8 @@ namespace viewpoint_interface
             drawDisplaySelector(0, "Pic-in-Pic Camera", LayoutDisplayRole::Secondary);
 
             ImGui::Separator();
+
+            ImGui::Text("Time to Hide: %is", countdown.getTimeRemaining());
 
             ImGui::Text("Picture-in-Picture Settings:\n");
             uint max_size = 600;
@@ -765,6 +771,13 @@ namespace viewpoint_interface
             addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
                     prim_data, 0, LayoutDisplayRole::Primary});
 
+            if (countdown.timerExpired() && countdown.acknowledgeExpiration()) {
+                pip_enabled = false;
+            }
+            else if (!countdown.timerExpired() && countdown.isInitialized()) {
+                pip_enabled = true;
+            }
+
             if (pip_enabled) {
                 displayPiPWindow(parameters.pip_window_dims[0], parameters.pip_window_dims[1], pip_id);
 
@@ -803,6 +816,11 @@ namespace viewpoint_interface
                     {
                         pip_enabled = !pip_enabled;
                     } break;
+
+                    case GLFW_KEY_S:
+                    {
+                        countdown.reset();
+                    }   break;
 
                     case GLFW_KEY_RIGHT:
                     {
@@ -875,6 +893,7 @@ namespace viewpoint_interface
         
         uint pip_id;
         bool keep_aspect_ratio, pip_enabled;
+        CountdownTimer countdown;
     };
 
 
