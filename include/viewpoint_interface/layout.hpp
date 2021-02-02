@@ -79,7 +79,7 @@ namespace viewpoint_interface
     {
         INACTIVE = -1,
         PILOT,
-        STACK,
+        SPLIT,
         GRID,
         PIP,
         CAROUSEL
@@ -549,6 +549,13 @@ namespace viewpoint_interface
         }
 
         virtual void displayPrimaryWindows() {
+            // TODO: Figure out grid spacing when there are multiple primary displays
+
+            ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+            ImVec2 work_size(main_viewport->GetWorkSize());
+
+            float width_step(work_size.x / prim_img_ids.size());
+            
             for (int i = 0; i < prim_img_ids.size(); i++) {
                 ImGuiWindowFlags win_flags = 0;
                 win_flags |= ImGuiWindowFlags_NoDecoration;
@@ -556,11 +563,9 @@ namespace viewpoint_interface
                 win_flags |= ImGuiWindowFlags_NoSavedSettings;
                 win_flags |= ImGuiWindowFlags_NoMove;
                 win_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus; // Otherwise, it overlays everything
-                ImGuiViewport* main_viewport = ImGui::GetMainViewport();
 
-                // TODO: Figure out grid spacing when there are multiple primary displays
-                ImGui::SetNextWindowPos(ImVec2(0.0, 0.0), ImGuiCond_Once);
-                ImGui::SetNextWindowSize(main_viewport->GetWorkSize());
+                ImGui::SetNextWindowPos(ImVec2(width_step * i, 0.0), ImGuiCond_Once);
+                ImGui::SetNextWindowSize(ImVec2(width_step, work_size.y));
 
                 // Maintain the right aspect ratio
                 const DisplayInfo &disp_info(displays.getDisplayInfoById(primary_displays.at(i)));
@@ -578,7 +583,8 @@ namespace viewpoint_interface
                     img_width = img_height * aspect_ratio;
                 }
 
-                if (startMenu("Primary Display", win_flags)) {
+                std::string menu_name("Primary Display##" + i);
+                if (startMenu(menu_name, win_flags)) {
                     // Center the image on the window
                     ImVec2 image_pos = ImVec2{(ImGui::GetWindowSize().x - img_width) * 0.5f, 
                                               (ImGui::GetWindowSize().y - img_height) * 0.5f};
@@ -624,7 +630,7 @@ namespace viewpoint_interface
     private:
         static const uint num_layout_types = 5;
         const std::vector<std::string> layout_names = {
-            "Pilot", "Stack", "Grid", "Picture-in-Picture", "Carousel"
+            "Pilot", "Split Screen", "Grid", "Picture-in-Picture", "Carousel"
         };
 
         LayoutType layout_type;
@@ -897,59 +903,67 @@ namespace viewpoint_interface
     };
 
 
-    struct StackParams
+    struct SplitParams
     {
-        uint start_num_displays = 3;
-        uint max_displays = 9; // TODO
-        uint primary_display = 0;
+        uint first_primary_display = 0;
+        uint second_primary_display = 1;
     };
 
-    class StackLayout : public Layout
+    class SplitLayout : public Layout
     {
     public:
 
-        StackLayout(DisplayManager &displays, StackParams params=StackParams()) : Layout(LayoutType::STACK, displays), 
+        SplitLayout(DisplayManager &displays, SplitParams params=SplitParams()) : Layout(LayoutType::SPLIT, displays), 
                 parameters(params) 
         {
-            if (parameters.start_num_displays > displays.size()) {
-                parameters.start_num_displays = displays.size();
-            }
-            if (parameters.start_num_displays > parameters.max_displays) {
-                parameters.start_num_displays = parameters.max_displays;
-            }
-            else if (parameters.start_num_displays == 0) {
-                parameters.start_num_displays = 1;
-            }
-
-            primary_display = parameters.primary_display;
+            addPrimaryDisplayByIx(parameters.first_primary_display);
+            addPrimaryDisplayByIx(parameters.second_primary_display);
         }
 
         virtual void displayLayoutParams() override
         {
-            static uint num_displays = parameters.start_num_displays;
-            static uint max_bound = num_displays < parameters.max_displays ? num_displays : parameters.max_displays;
+            // static uint num_displays = parameters.start_num_displays;
+            // static uint max_bound = num_displays < parameters.max_displays ? num_displays : parameters.max_displays;
 
             drawDisplaysList(); 
 
-            ImGui::SliderInt("# Displays", (int *) &num_displays, 1, max_bound);
+            // ImGui::SliderInt("# Displays", (int *) &num_displays, 1, max_bound);
 
             drawDraggableRing();
 
-            drawDisplaySelector(0);
+            drawDisplaySelector(0, "Left Display", LayoutDisplayRole::Primary);
+            drawDisplaySelector(1, "Right Display", LayoutDisplayRole::Primary);
         }
 
         virtual void draw() override
         {
+            handleImageResponse();
 
+            std::map<std::string, bool> states;
+            states["Robot"] = !clutching;
+            states["Suction"] = grabbing;
+            displayStateValues(states);
+
+            displayPrimaryWindows();
+
+            for (int i = 0; i < 2; i++) {
+                std::vector<uchar> &prim_data = displays.getDisplayDataById(primary_displays.at(i));
+                const DisplayInfo &prim_info(displays.getDisplayInfoById(primary_displays.at(i)));
+                addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
+                        prim_data, (uint)i, LayoutDisplayRole::Primary});
+            }
         }
 
         virtual void handleImageResponse() override
         {
-
+            for (int i = 0; i < image_response_queue.size(); i++) {
+                DisplayImageResponse &response(image_response_queue.at(i));
+                prim_img_ids[response.index] = response.id;
+            }
         }
 
     private:
-        StackParams parameters;
+        SplitParams parameters;
         uint primary_display;
     };
 
@@ -1121,9 +1135,9 @@ namespace viewpoint_interface
                     layout = std::shared_ptr<Layout>(new PilotLayout(displays));
                 } break;
 
-                case LayoutType::STACK:
+                case LayoutType::SPLIT:
                 {
-                    layout = std::shared_ptr<Layout>(new StackLayout(displays));
+                    layout = std::shared_ptr<Layout>(new SplitLayout(displays));
                 } break;
 
                 case LayoutType::GRID:
