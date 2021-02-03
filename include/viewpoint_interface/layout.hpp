@@ -83,9 +83,7 @@ enum LayoutType
     INACTIVE = -1,
     PILOT,
     SPLIT,
-    GRID, // TODO: Add Twinned
-    PIP,
-    CAROUSEL
+    TWINNED
 };
 
 enum LayoutCommand
@@ -241,9 +239,9 @@ protected:
     void drawCarouselMenu() const;
 
 private:
-    static const uint kNumLayoutTypes = 5;
+    static const uint kNumLayoutTypes = 3;
     const std::vector<std::string> kLayoutNames = {
-        "Pilot", "Split Screen", "Grid", "Picture-in-Picture", "Carousel"
+        "Pilot", "Split Screen", "Twinned"
     };
 
     LayoutType layout_type_;
@@ -252,382 +250,371 @@ private:
 };
     
 
-    class InactiveLayout : public Layout
-    {
-    public:
-        InactiveLayout(DisplayManager &displays) : Layout(LayoutType::INACTIVE, displays) {}
+class InactiveLayout : public Layout
+{
+public:
+    InactiveLayout(DisplayManager &displays) : Layout(LayoutType::INACTIVE, displays) {}
 
-        virtual void displayLayoutParams() override
-        {
-            ImGui::Text("No layouts selected:");
-            ImGui::BulletText("Please select a layout from the menu\n"
-                            "at the top of the window.");
+    virtual void displayLayoutParams() override
+    {
+        ImGui::Text("No layouts selected:");
+        ImGui::BulletText("Please select a layout from the menu\n"
+                        "at the top of the window.");
+    }
+
+    virtual void draw() override {}
+
+    virtual void handleImageResponse() override {}
+};
+
+
+struct PilotParams
+{
+    uint start_primary_display = 0;
+    uint start_pip_display = 1;
+    uint max_num_displays = 3;
+
+    int pip_window_dims[2] = { 400, 225 };
+    int pip_aspect_ratio[2] = { 16, 9 };
+};
+
+class PilotLayout : public Layout
+{
+public:
+    PilotLayout(DisplayManager &displays, PilotParams params=PilotParams()) : Layout(LayoutType::PILOT, displays),
+            parameters_(params), keep_aspect_ratio_(true), pip_enabled_(true), 
+            countdown_(5, Timer::DurationType::SECONDS)
+    {
+        if (parameters_.max_num_displays > displays.size() || parameters_.max_num_displays == 0) {
+            parameters_.max_num_displays = displays.size();
         }
 
-        virtual void draw() override {}
+        addPrimaryDisplayByIx(parameters_.start_primary_display);
+        secondary_displays_.push_back(displays.getDisplayId(parameters_.start_pip_display));
+    }
 
-        virtual void handleImageResponse() override {}
-    };
-
-
-    struct PilotParams
+    virtual void displayLayoutParams() override
     {
-        uint start_primary_display = 0;
-        uint start_pip_display = 1;
-        uint max_num_displays = 3;
+        static uint cur_num_displays = parameters_.max_num_displays;
 
-        int pip_window_dims[2] = { 400, 225 };
-        int pip_aspect_ratio[2] = { 16, 9 };
-    };
+        drawDisplaysList();
 
-    class PilotLayout : public Layout
-    {
-    public:
-        PilotLayout(DisplayManager &displays, PilotParams params=PilotParams()) : Layout(LayoutType::PILOT, displays),
-                parameters_(params), keep_aspect_ratio_(true), pip_enabled_(true), 
-                countdown_(5, Timer::DurationType::SECONDS)
-        {
-            if (parameters_.max_num_displays > displays.size() || parameters_.max_num_displays == 0) {
-                parameters_.max_num_displays = displays.size();
-            }
+        ImGui::SliderInt("# Displays", (int *) &cur_num_displays, 1, parameters_.max_num_displays);
 
-            addPrimaryDisplayByIx(parameters_.start_primary_display);
-            secondary_displays_.push_back(displays.getDisplayId(parameters_.start_pip_display));
-        }
+        drawDraggableRing();
 
-        virtual void displayLayoutParams() override
-        {
-            static uint cur_num_displays = parameters_.max_num_displays;
+        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
+        drawDisplaySelector(0, "Pic-in-Pic Display", LayoutDisplayRole::Secondary);
 
-            drawDisplaysList();
+        ImGui::Separator();
 
-            ImGui::SliderInt("# Displays", (int *) &cur_num_displays, 1, parameters_.max_num_displays);
+        ImGui::Text("Time to Hide: %is", countdown_.getTimeRemaining());
 
-            drawDraggableRing();
+        ImGui::Text("Picture-in-Picture Settings:\n");
+        uint max_size = 600;
+        int start_pip_dims[2] = { parameters_.pip_window_dims[0], parameters_.pip_window_dims[1] };
+        bool pip_dims_changed = ImGui::DragInt2("Dimensions", parameters_.pip_window_dims, 1.0f, 100, max_size);
+        bool ar_changed = ImGui::Checkbox("Keep Aspect Ratio", &keep_aspect_ratio_);
 
-            drawDisplaySelector(0, "Main Camera", LayoutDisplayRole::Primary);
-            drawDisplaySelector(0, "Pic-in-Pic Camera", LayoutDisplayRole::Secondary);
+        if (keep_aspect_ratio_) {
+            ImGui::Text("Aspect Ratio");
+            ImGui::SameLine();
+            ar_changed = ImGui::InputInt2("##PiP AR", parameters_.pip_aspect_ratio) || ar_changed;
 
-            ImGui::Separator();
+            if (pip_dims_changed || ar_changed) {
+                float aspect_ratio = (float)parameters_.pip_aspect_ratio[0] / parameters_.pip_aspect_ratio[1];
+                
+                // Clamp both axes to max_size
+                int max_width(max_size), max_height(max_size);
+                if (aspect_ratio > 1.0) {
+                    // Width is largest
+                    max_height = max_size * (1.0 / aspect_ratio);
+                }
+                else {
+                    // Height is largest or same
+                    max_width = max_size * aspect_ratio;
+                }
 
-            ImGui::Text("Time to Hide: %is", countdown_.getTimeRemaining());
-
-            ImGui::Text("Picture-in-Picture Settings:\n");
-            uint max_size = 600;
-            int start_pip_dims[2] = { parameters_.pip_window_dims[0], parameters_.pip_window_dims[1] };
-            bool pip_dims_changed = ImGui::DragInt2("Dimensions", parameters_.pip_window_dims, 1.0f, 100, max_size);
-            bool ar_changed = ImGui::Checkbox("Keep Aspect Ratio", &keep_aspect_ratio_);
-
-            if (keep_aspect_ratio_) {
-                ImGui::Text("Aspect Ratio");
-                ImGui::SameLine();
-                ar_changed = ImGui::InputInt2("##PiP AR", parameters_.pip_aspect_ratio) || ar_changed;
-
-                if (pip_dims_changed || ar_changed) {
-                    float aspect_ratio = (float)parameters_.pip_aspect_ratio[0] / parameters_.pip_aspect_ratio[1];
-                    
-                    // Clamp both axes to max_size
-                    int max_width(max_size), max_height(max_size);
-                    if (aspect_ratio > 1.0) {
-                        // Width is largest
-                        max_height = max_size * (1.0 / aspect_ratio);
+                if (parameters_.pip_window_dims[0] > max_width || 
+                        parameters_.pip_window_dims[1] > max_height) {
+                    parameters_.pip_window_dims[0] = max_width;
+                    parameters_.pip_window_dims[1] = max_height;
+                }
+                else {
+                    if (parameters_.pip_window_dims[1]-start_pip_dims[1] != 0) {
+                        // Height changed
+                        parameters_.pip_window_dims[0] = parameters_.pip_window_dims[1] * aspect_ratio;
                     }
                     else {
-                        // Height is largest or same
-                        max_width = max_size * aspect_ratio;
-                    }
-
-                    if (parameters_.pip_window_dims[0] > max_width || 
-                            parameters_.pip_window_dims[1] > max_height) {
-                        parameters_.pip_window_dims[0] = max_width;
-                        parameters_.pip_window_dims[1] = max_height;
-                    }
-                    else {
-                        if (parameters_.pip_window_dims[1]-start_pip_dims[1] != 0) {
-                            // Height changed
-                            parameters_.pip_window_dims[0] = parameters_.pip_window_dims[1] * aspect_ratio;
-                        }
-                        else {
-                            // Width changed
-                            aspect_ratio = 1.0 / aspect_ratio;
-                            parameters_.pip_window_dims[1] = parameters_.pip_window_dims[0] * aspect_ratio;
-                        }
+                        // Width changed
+                        aspect_ratio = 1.0 / aspect_ratio;
+                        parameters_.pip_window_dims[1] = parameters_.pip_window_dims[0] * aspect_ratio;
                     }
                 }
             }
         }
+    }
 
-        virtual void draw() override
-        {
-            handleImageResponse();
+    virtual void draw() override
+    {
+        handleImageResponse();
 
-            std::map<std::string, bool> states;
-            states["Robot"] = !clutching_;
-            states["Suction"] = grabbing_;
-            displayStateValues(states);
+        std::map<std::string, bool> states;
+        states["Robot"] = !clutching_;
+        states["Suction"] = grabbing_;
+        displayStateValues(states);
 
-            // We only have one primary and one Pic-in-pic display
-            displayPrimaryWindows();
+        // We only have one primary and one Pic-in-pic display
+        displayPrimaryWindows();
 
-            std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(0));
-            const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
-            addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
-                    prim_data, 0, LayoutDisplayRole::Primary});
+        std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(0));
+        const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
+        addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
+                prim_data, 0, LayoutDisplayRole::Primary});
 
-            if (countdown_.timerExpired() && countdown_.acknowledgeExpiration()) {
-                pip_enabled_ = false;
-            }
-            else if (!countdown_.timerExpired() && countdown_.isInitialized()) {
-                pip_enabled_ = true;
-            }
-
-            if (pip_enabled_) {
-                displayPiPWindow(parameters_.pip_window_dims[0], parameters_.pip_window_dims[1], pip_id_);
-
-                std::vector<uchar> &sec_data = displays_.getDisplayDataById(secondary_displays_[0]);
-                const DisplayInfo &sec_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
-                addImageRequestToQueue(DisplayImageRequest{sec_info.dimensions.width, sec_info.dimensions.height, 
-                        sec_data, 0, LayoutDisplayRole::Secondary});
-            }
+        if (countdown_.timerExpired() && countdown_.acknowledgeExpiration()) {
+            pip_enabled_ = false;
+        }
+        else if (!countdown_.timerExpired() && countdown_.isInitialized()) {
+            pip_enabled_ = true;
         }
 
-        virtual void handleImageResponse() override
-        {
-            for (int i = 0; i < image_response_queue_.size(); i++) {
-                DisplayImageResponse &response(image_response_queue_.at(i));
+        if (pip_enabled_) {
+            displayPiPWindow(parameters_.pip_window_dims[0], parameters_.pip_window_dims[1], pip_id_);
 
-                switch (response.role)
-                {
-                    case LayoutDisplayRole::Primary:
-                    {
-                        prim_img_ids_[response.index] = response.id;
-                    }   break;
-
-                    case LayoutDisplayRole::Secondary:
-                    {
-                        pip_id_ = response.id;
-                    }   break;
-                }
-            }
+            std::vector<uchar> &sec_data = displays_.getDisplayDataById(secondary_displays_[0]);
+            const DisplayInfo &sec_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
+            addImageRequestToQueue(DisplayImageRequest{sec_info.dimensions.width, sec_info.dimensions.height, 
+                    sec_data, 0, LayoutDisplayRole::Secondary});
         }
+    }
 
-        virtual void handleKeyInput(int key, int action, int mods) override
-        {
-            if (action == GLFW_PRESS) {
-                switch (key) {
-                    case GLFW_KEY_P:
-                    {
-                        pip_enabled_ = !pip_enabled_;
-                    } break;
+    virtual void handleImageResponse() override
+    {
+        for (int i = 0; i < image_response_queue_.size(); i++) {
+            DisplayImageResponse &response(image_response_queue_.at(i));
 
-                    case GLFW_KEY_S:
-                    {
-                        countdown_.reset();
-                    }   break;
-
-                    case GLFW_KEY_RIGHT:
-                    {
-                        toNextDisplay(0, LayoutDisplayRole::Primary);
-                    } break;
-
-                    case GLFW_KEY_LEFT:
-                    {
-                        toPrevDisplay(0, LayoutDisplayRole::Primary);
-                    } break;
-
-                    case GLFW_KEY_UP:
-                    {
-                        toPrevDisplay(0, LayoutDisplayRole::Secondary);
-                    } break;
-
-                    case GLFW_KEY_DOWN:
-                    {
-                        toNextDisplay(0, LayoutDisplayRole::Secondary);
-                    } break;
-
-                    default:
-                    {
-                    } break;
-                }
-            }
-        }
-
-        virtual void handleControllerInput(std::string input) override
-        {
-            LayoutCommand command(translateControllerInputToCommand(input));
-
-            switch(command)
+            switch (response.role)
             {
-                case LayoutCommand::PRIMARY_NEXT:
+                case LayoutDisplayRole::Primary:
                 {
-                    toNextDisplay(0, LayoutDisplayRole::Primary);
+                    prim_img_ids_[response.index] = response.id;
                 }   break;
 
-                case LayoutCommand::PRIMARY_PREV:
+                case LayoutDisplayRole::Secondary:
                 {
-                    toPrevDisplay(0, LayoutDisplayRole::Primary);
+                    pip_id_ = response.id;
                 }   break;
+            }
+        }
+    }
 
-                case LayoutCommand::SECONDARY_NEXT:
-                {
-                    toNextDisplay(0, LayoutDisplayRole::Secondary);
-                }   break;
-
-                case LayoutCommand::SECONDARY_PREV:
-                {
-                    toPrevDisplay(0, LayoutDisplayRole::Secondary);
-                }   break;
-
-                case LayoutCommand::PIP_TOGGLE:
+    virtual void handleKeyInput(int key, int action, int mods) override
+    {
+        if (action == GLFW_PRESS) {
+            switch (key) {
+                case GLFW_KEY_P:
                 {
                     pip_enabled_ = !pip_enabled_;
+                } break;
+
+                case GLFW_KEY_S:
+                {
+                    countdown_.reset();
                 }   break;
+
+                case GLFW_KEY_RIGHT:
+                {
+                    toNextDisplay(0, LayoutDisplayRole::Primary);
+                } break;
+
+                case GLFW_KEY_LEFT:
+                {
+                    toPrevDisplay(0, LayoutDisplayRole::Primary);
+                } break;
+
+                case GLFW_KEY_UP:
+                {
+                    toPrevDisplay(0, LayoutDisplayRole::Secondary);
+                } break;
+
+                case GLFW_KEY_DOWN:
+                {
+                    toNextDisplay(0, LayoutDisplayRole::Secondary);
+                } break;
 
                 default:
                 {
-
-                }   break;
+                } break;
             }
         }
+    }
 
-
-    private:
-        PilotParams parameters_;
-        
-        uint pip_id_;
-        bool keep_aspect_ratio_, pip_enabled_;
-        CountdownTimer countdown_;
-    };
-
-
-    struct SplitParams
+    virtual void handleControllerInput(std::string input) override
     {
-        uint first_primary_display = 0;
-        uint second_primary_display = 1;
-    };
+        LayoutCommand command(translateControllerInputToCommand(input));
 
-    class SplitLayout : public Layout
+        switch(command)
+        {
+            case LayoutCommand::PRIMARY_NEXT:
+            {
+                toNextDisplay(0, LayoutDisplayRole::Primary);
+            }   break;
+
+            case LayoutCommand::PRIMARY_PREV:
+            {
+                toPrevDisplay(0, LayoutDisplayRole::Primary);
+            }   break;
+
+            case LayoutCommand::SECONDARY_NEXT:
+            {
+                toNextDisplay(0, LayoutDisplayRole::Secondary);
+            }   break;
+
+            case LayoutCommand::SECONDARY_PREV:
+            {
+                toPrevDisplay(0, LayoutDisplayRole::Secondary);
+            }   break;
+
+            case LayoutCommand::PIP_TOGGLE:
+            {
+                pip_enabled_ = !pip_enabled_;
+            }   break;
+
+            default:
+            {
+
+            }   break;
+        }
+    }
+
+
+private:
+    PilotParams parameters_;
+    
+    uint pip_id_;
+    bool keep_aspect_ratio_, pip_enabled_;
+    CountdownTimer countdown_;
+};
+
+
+struct SplitParams
+{
+    uint first_primary_display = 0;
+    uint second_primary_display = 1;
+};
+
+class SplitLayout : public Layout
+{
+public:
+
+    SplitLayout(DisplayManager &displays, SplitParams params=SplitParams()) : Layout(LayoutType::SPLIT, displays),
+            parameters_(params) 
     {
-    public:
+        addPrimaryDisplayByIx(parameters_.first_primary_display);
+        addPrimaryDisplayByIx(parameters_.second_primary_display);
+    }
 
-        SplitLayout(DisplayManager &displays, SplitParams params=SplitParams()) : Layout(LayoutType::SPLIT, displays), 
-                parameters_(params) 
-        {
-            addPrimaryDisplayByIx(parameters_.first_primary_display);
-            addPrimaryDisplayByIx(parameters_.second_primary_display);
-        }
-
-        virtual void displayLayoutParams() override
-        {
-            // static uint num_displays = parameters.start_num_displays;
-            // static uint max_bound = num_displays < parameters.max_displays ? num_displays : parameters.max_displays;
-
-            drawDisplaysList(); 
-
-            // ImGui::SliderInt("# Displays", (int *) &num_displays, 1, max_bound);
-
-            drawDraggableRing();
-
-            drawDisplaySelector(0, "Left Display", LayoutDisplayRole::Primary);
-            drawDisplaySelector(1, "Right Display", LayoutDisplayRole::Primary);
-        }
-
-        virtual void draw() override
-        {
-            handleImageResponse();
-
-            std::map<std::string, bool> states;
-            states["Robot"] = !clutching_;
-            states["Suction"] = grabbing_;
-            displayStateValues(states);
-
-            displayPrimaryWindows();
-
-            for (int i = 0; i < 2; i++) {
-                std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(i));
-                const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(i)));
-                addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
-                        prim_data, (uint)i, LayoutDisplayRole::Primary});
-            }
-        }
-
-        virtual void handleImageResponse() override
-        {
-            for (int i = 0; i < image_response_queue_.size(); i++) {
-                DisplayImageResponse &response(image_response_queue_.at(i));
-                prim_img_ids_[response.index] = response.id;
-            }
-        }
-
-    private:
-        SplitParams parameters_;
-    };
-
-    class GridLayout : public Layout
+    virtual void displayLayoutParams() override
     {
-    public:
-        GridLayout(DisplayManager &displays) : Layout(LayoutType::GRID, displays) {}
+        // static uint num_displays = parameters.start_num_displays;
+        // static uint max_bound = num_displays < parameters.max_displays ? num_displays : parameters.max_displays;
 
-        virtual void displayLayoutParams() override
-        {
+        drawDisplaysList(); 
 
-        }
+        // ImGui::SliderInt("# Displays", (int *) &num_displays, 1, max_bound);
 
-        virtual void draw() override
-        {
-            
-        }
+        drawDraggableRing();
 
-        virtual void handleImageResponse() override
-        {
-            
-        }
+        drawDisplaySelector(0, "Left Display", LayoutDisplayRole::Primary);
+        drawDisplaySelector(1, "Right Display", LayoutDisplayRole::Primary);
+    }
 
-    };
-
-    class PipLayout : public Layout
+    virtual void draw() override
     {
-    public:
-        PipLayout(DisplayManager &displays) : Layout(LayoutType::PIP, displays) {}
+        handleImageResponse();
 
-        virtual void displayLayoutParams() override
-        {
+        std::map<std::string, bool> states;
+        states["Robot"] = !clutching_;
+        states["Suction"] = grabbing_;
+        displayStateValues(states);
 
+        displayPrimaryWindows();
+
+        for (int i = 0; i < 2; i++) {
+            std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(i));
+            const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(i)));
+            addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
+                    prim_data, (uint)i, LayoutDisplayRole::Primary});
         }
+    }
 
-        virtual void draw() override
-        {
-            
-        }
-
-        virtual void handleImageResponse() override
-        {
-            
-        }
-
-    };
-
-    class CarouselLayout : public Layout
+    virtual void handleImageResponse() override
     {
-    public:
-        CarouselLayout(DisplayManager &displays) : Layout(LayoutType::CAROUSEL, displays) {}
-
-        virtual void displayLayoutParams() override
-        {
-
+        for (int i = 0; i < image_response_queue_.size(); i++) {
+            DisplayImageResponse &response(image_response_queue_.at(i));
+            prim_img_ids_[response.index] = response.id;
         }
+    }
 
-        virtual void draw() override
-        {
-            
+private:
+    SplitParams parameters_;
+};
+
+
+struct TwinnedParams
+{
+    uint primary_display = 0;
+};
+
+class TwinnedLayout : public Layout
+{
+public:
+    TwinnedLayout(DisplayManager &displays, TwinnedParams params=TwinnedParams()) : 
+            Layout(LayoutType::TWINNED, displays), parameters_(params) 
+    {
+        addPrimaryDisplayByIx(parameters_.primary_display);
+    }
+
+    virtual void displayLayoutParams() override
+    {
+        // TODO: This should limit to only two displays available
+        drawDisplaysList();
+
+        drawDraggableRing();
+
+        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
+    }
+
+    virtual void draw() override
+    {
+        handleImageResponse();
+
+        std::map<std::string, bool> states;
+        states["Robot"] = !clutching_;
+        states["Suction"] = grabbing_;
+        displayStateValues(states);
+
+        displayPrimaryWindows();
+
+        std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(0));
+        const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
+        addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
+                prim_data, (uint)0, LayoutDisplayRole::Primary});           
+    }
+
+    virtual void handleImageResponse() override
+    {
+        for (int i = 0; i < image_response_queue_.size(); i++) {
+            DisplayImageResponse &response(image_response_queue_.at(i));
+            prim_img_ids_[response.index] = response.id;
         }
+    }
 
-        virtual void handleImageResponse() override
-        {
-            
-        }
+private:
+    TwinnedParams parameters_;
+};
 
-    };
 
 
     class LayoutManager
@@ -736,19 +723,9 @@ private:
                     layout = std::shared_ptr<Layout>(new SplitLayout(displays));
                 } break;
 
-                case LayoutType::GRID:
+                case LayoutType::TWINNED:
                 {
-                    layout = std::shared_ptr<Layout>(new GridLayout(displays));
-                } break;
-
-                case LayoutType::PIP:
-                {
-                    layout = std::shared_ptr<Layout>(new PipLayout(displays));
-                } break;
-
-                case LayoutType::CAROUSEL:
-                {
-                    layout = std::shared_ptr<Layout>(new CarouselLayout(displays));
+                    layout = std::shared_ptr<Layout>(new TwinnedLayout(displays));
                 } break;
 
                 default: 
