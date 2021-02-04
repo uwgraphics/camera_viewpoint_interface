@@ -337,14 +337,17 @@ void Layout::drawDraggableRing()
 
 void Layout::displayPrimaryWindows() const
 {
-    // TODO: Figure out grid spacing when there are multiple primary displays
-
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
     ImVec2 work_size(main_viewport->GetWorkSize());
+    uint num_displays(prim_img_ids_.size());
 
-    float width_step(work_size.x / prim_img_ids_.size());
-    
-    for (int i = 0; i < prim_img_ids_.size(); i++) {
+    bool displays_even(num_displays % 2 == 0); // Even # of displays?
+    uint half_num_displays(std::ceil(num_displays / 2.0)); // Account for horizontal split
+    uint vert_slices(half_num_displays > 3 ? 3 : half_num_displays); // Clamp vertical slices
+    float width_split(work_size.x / (float)vert_slices);
+    float height_split(work_size.y / (num_displays > 1 ? 2.0 : 1.0));
+
+    for (int i = 0; i < num_displays; i++) {
         ImGuiWindowFlags win_flags = 0;
         win_flags |= ImGuiWindowFlags_NoDecoration;
         win_flags |= ImGuiWindowFlags_NoInputs;
@@ -352,22 +355,35 @@ void Layout::displayPrimaryWindows() const
         win_flags |= ImGuiWindowFlags_NoMove;
         win_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus; // Otherwise, it overlays everything
 
-        ImGui::SetNextWindowPos(ImVec2(width_step * i, 0.0), ImGuiCond_Once);
-        ImGui::SetNextWindowSize(ImVec2(width_step, work_size.y));
+        // TODO: Handle more than 6 (3 slices * 2 halves) displays
+
+        float width_pos, height_pos, width_pad;
+        if (displays_even) {
+            width_pad = 0.0;
+        }
+        else {
+            // Add padding to bottom windows if number of displays is odd
+            width_pad = (width_split / 2.0) * (i % 2);
+        }
+        // Move further to the right every other display
+        width_pos = (width_split * std::floor(i/2.0)) + width_pad;
+        // Jump back and forth b/w top and bottom halves
+        height_pos = height_split * (i % 2);
+        ImGui::SetNextWindowPos(ImVec2(width_pos, height_pos), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(width_split, height_split));
 
         // Maintain the right aspect ratio
         const DisplayInfo &disp_info(displays_.getDisplayInfoById(primary_displays_.at(i)));
         float aspect_ratio = (float)disp_info.dimensions.width / disp_info.dimensions.height;
 
-        ImVec2 image_dims = main_viewport->GetWorkSize();
         ImVec2 padding{5, 5};
 
-        float img_width = image_dims.x - (2*padding.x);
+        float img_width = width_split - (2*padding.x);
         float img_height = img_width * (1.0/aspect_ratio);
 
-        if (img_height > image_dims.y) {
-            // Converted height is too large--convert width instead
-            img_height = image_dims.y - (2*padding.y);
+        if (img_height > height_split) {
+            // If converted height is too large, convert width instead
+            img_height = height_split - (2*padding.y);
             img_width = img_height * aspect_ratio;
         }
 
@@ -384,7 +400,8 @@ void Layout::displayPrimaryWindows() const
             // Show camera external name on top of image
             ImGui::SetCursorPos({image_pos.x + 10, image_pos.y + 5});
             const std::string &title(displays_.getDisplayExternalNameById(primary_displays_.at(i)));
-            ImGui::Text(title.c_str());
+            ImVec4 label_color(ImVec4(0.9, 0.2, 0.9, 1.0));
+            ImGui::TextColored(label_color, title.c_str());
 
             endMenu();
         }
