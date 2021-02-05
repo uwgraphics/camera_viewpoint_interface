@@ -340,10 +340,11 @@ void Layout::displayPrimaryWindows() const
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
     ImVec2 work_size(main_viewport->GetWorkSize());
     uint num_displays(prim_img_ids_.size());
+    uint max_vertical_slices(4); // Note: This is half of total displays b/c of horizontal slicing
 
     bool displays_even(num_displays % 2 == 0); // Even # of displays?
     uint half_num_displays(std::ceil(num_displays / 2.0)); // Account for horizontal split
-    uint vert_slices(half_num_displays > 3 ? 3 : half_num_displays); // Clamp vertical slices
+    uint vert_slices(half_num_displays > max_vertical_slices ? max_vertical_slices : half_num_displays); // Clamp vertical slices
     float width_split(work_size.x / (float)vert_slices);
     float height_split(work_size.y / (num_displays > 1 ? 2.0 : 1.0));
 
@@ -355,7 +356,7 @@ void Layout::displayPrimaryWindows() const
         win_flags |= ImGuiWindowFlags_NoMove;
         win_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus; // Otherwise, it overlays everything
 
-        // TODO: Handle more than 6 (3 slices * 2 halves) displays
+        // TODO: Handle more than [max_vert_slices * 2] displays
 
         float width_pos, height_pos, width_pad;
         if (displays_even) {
@@ -396,12 +397,10 @@ void Layout::displayPrimaryWindows() const
 
             ImGui::Image(reinterpret_cast<ImTextureID>(prim_img_ids_.at(i)), ImVec2 {img_width, img_height});
             
-            // TODO: Fix this for split screen
             // Show camera external name on top of image
             ImGui::SetCursorPos({image_pos.x + 10, image_pos.y + 5});
             const std::string &title(displays_.getDisplayExternalNameById(primary_displays_.at(i)));
-            ImVec4 label_color(ImVec4(0.9, 0.2, 0.9, 1.0));
-            ImGui::TextColored(label_color, title.c_str());
+            ImGui::Text(title.c_str());
 
             endMenu();
         }
