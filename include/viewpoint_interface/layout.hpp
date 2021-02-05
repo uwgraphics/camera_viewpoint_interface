@@ -81,7 +81,7 @@ bool isItemInVector(T item, const std::vector<T> &vec)
 enum LayoutType
 {
     INACTIVE = -1,
-    PILOT,
+    PIP,
     SPLIT,
     TWINNED
 };
@@ -241,7 +241,7 @@ protected:
 private:
     static const uint kNumLayoutTypes = 3;
     const std::vector<std::string> kLayoutNames = {
-        "Pilot", "Split Screen", "Twinned"
+        "Picture-in-Picture", "Split Screen", "Twinned"
     };
 
     LayoutType layout_type_;
@@ -268,7 +268,7 @@ public:
 };
 
 
-struct PilotParams
+struct PiPParams
 {
     uint start_primary_display = 0;
     uint start_pip_display = 1;
@@ -278,10 +278,10 @@ struct PilotParams
     int pip_aspect_ratio[2] = { 16, 9 };
 };
 
-class PilotLayout : public Layout
+class PiPLayout : public Layout
 {
 public:
-    PilotLayout(DisplayManager &displays, PilotParams params=PilotParams()) : Layout(LayoutType::PILOT, displays),
+    PiPLayout(DisplayManager &displays, PiPParams params=PiPParams()) : Layout(LayoutType::PIP, displays),
             parameters_(params), keep_aspect_ratio_(true), pip_enabled_(true), 
             countdown_(5, Timer::DurationType::SECONDS)
     {
@@ -456,41 +456,19 @@ public:
 
         switch(command)
         {
-            case LayoutCommand::PRIMARY_NEXT:
-            {
-                toNextDisplay(0, LayoutDisplayRole::Primary);
-            }   break;
-
-            case LayoutCommand::PRIMARY_PREV:
-            {
-                toPrevDisplay(0, LayoutDisplayRole::Primary);
-            }   break;
-
-            case LayoutCommand::SECONDARY_NEXT:
-            {
-                toNextDisplay(0, LayoutDisplayRole::Secondary);
-            }   break;
-
-            case LayoutCommand::SECONDARY_PREV:
-            {
-                toPrevDisplay(0, LayoutDisplayRole::Secondary);
-            }   break;
-
             case LayoutCommand::PIP_TOGGLE:
             {
                 pip_enabled_ = !pip_enabled_;
             }   break;
 
             default:
-            {
-
-            }   break;
+            {}  break;
         }
     }
 
 
 private:
-    PilotParams parameters_;
+    PiPParams parameters_;
     
     uint pip_id_;
     bool keep_aspect_ratio_, pip_enabled_;
@@ -561,7 +539,8 @@ private:
     SplitParams parameters_;
 };
 
-
+// TODO: Make sure to use the same button to switch displays as PiP layout
+// uses for toggling PiP window
 struct TwinnedParams
 {
     uint primary_display = 0;
@@ -608,6 +587,22 @@ public:
         for (int i = 0; i < image_response_queue_.size(); i++) {
             DisplayImageResponse &response(image_response_queue_.at(i));
             prim_img_ids_[response.index] = response.id;
+        }
+    }
+
+    virtual void handleControllerInput(std::string input) override
+    {
+        LayoutCommand command(translateControllerInputToCommand(input));
+
+        switch(command)
+        {
+            case LayoutCommand::PRIMARY_NEXT:
+            {
+                toNextDisplay(0, LayoutDisplayRole::Primary);
+            }   break;
+
+            default:
+            {}  break;
         }
     }
 
@@ -713,9 +708,9 @@ private:
         {
             std::shared_ptr<Layout> layout;
             switch(type) {
-                case LayoutType::PILOT:
+                case LayoutType::PIP:
                 {
-                    layout = std::shared_ptr<Layout>(new PilotLayout(displays));
+                    layout = std::shared_ptr<Layout>(new PiPLayout(displays));
                 } break;
 
                 case LayoutType::SPLIT:
