@@ -76,11 +76,13 @@ bool isItemInVector(T item, const std::vector<T> &vec)
 // - Add/change enum entry in LayoutType for layout
 // - Edit num_layout_types and layout_names in Layout class
 // - Create/change subclass inheriting from Layout class
-// - Implement virtual classes for layout, if necessary
+// - Implement virtual functions for layout, if necessary
 // - Add/change entry for layout in newLayout() function of LayoutManager
 enum LayoutType
 {
     INACTIVE = -1,
+    DYNAMIC,
+    WIDE,
     PIP,
     SPLIT,
     TWINNED
@@ -239,9 +241,9 @@ protected:
     void drawCarouselMenu() const;
 
 private:
-    static const uint kNumLayoutTypes = 3;
+    static const uint kNumLayoutTypes = 5;
     const std::vector<std::string> kLayoutNames = {
-        "Picture-in-Picture", "Split Screen", "Twinned"
+        "Dynamic Camera", "Wide Angle", "Picture-in-Picture", "Split Screen", "Twinned"
     };
 
     LayoutType layout_type_;
@@ -265,6 +267,134 @@ public:
     virtual void draw() override {}
 
     virtual void handleImageResponse() override {}
+};
+
+
+struct DynamicParams
+{
+    uint primary_display = 0;
+};
+
+class DynamicLayout : public Layout
+{
+public:
+    DynamicLayout(DisplayManager &displays, DynamicParams params=DynamicParams()) : 
+            Layout(LayoutType::DYNAMIC, displays), parameters_(params) 
+    {
+        addPrimaryDisplayByIx(parameters_.primary_display);
+    }
+
+    virtual void displayLayoutParams() override
+    {
+        drawDisplaysList();
+
+        drawDraggableRing();
+
+        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
+    }
+
+    virtual void draw() override
+    {
+        handleImageResponse();
+
+        std::map<std::string, bool> states;
+        states["Robot"] = !clutching_;
+        states["Suction"] = grabbing_;
+        displayStateValues(states);
+
+        displayPrimaryWindows();
+
+        std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(0));
+        const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
+        addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
+                prim_data, (uint)0, LayoutDisplayRole::Primary});           
+    }
+
+    virtual void handleImageResponse() override
+    {
+        for (int i = 0; i < image_response_queue_.size(); i++) {
+            DisplayImageResponse &response(image_response_queue_.at(i));
+            prim_img_ids_[response.index] = response.id;
+        }
+    }
+
+    virtual void handleControllerInput(std::string input) override
+    {
+        LayoutCommand command(translateControllerInputToCommand(input));
+
+        switch(command)
+        {
+            default:
+            {}  break;
+        }
+    }
+
+private:
+    DynamicParams parameters_;
+};
+
+
+struct WideParams
+{
+    uint primary_display = 1;
+};
+
+class WideLayout : public Layout
+{
+public:
+    WideLayout(DisplayManager &displays, WideParams params=WideParams()) : 
+            Layout(LayoutType::WIDE, displays), parameters_(params) 
+    {
+        addPrimaryDisplayByIx(parameters_.primary_display);
+    }
+
+    virtual void displayLayoutParams() override
+    {
+        drawDisplaysList();
+
+        drawDraggableRing();
+
+        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
+    }
+
+    virtual void draw() override
+    {
+        handleImageResponse();
+
+        std::map<std::string, bool> states;
+        states["Robot"] = !clutching_;
+        states["Suction"] = grabbing_;
+        displayStateValues(states);
+
+        displayPrimaryWindows();
+
+        std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(0));
+        const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
+        addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
+                prim_data, (uint)0, LayoutDisplayRole::Primary});           
+    }
+
+    virtual void handleImageResponse() override
+    {
+        for (int i = 0; i < image_response_queue_.size(); i++) {
+            DisplayImageResponse &response(image_response_queue_.at(i));
+            prim_img_ids_[response.index] = response.id;
+        }
+    }
+
+    virtual void handleControllerInput(std::string input) override
+    {
+        LayoutCommand command(translateControllerInputToCommand(input));
+
+        switch(command)
+        {
+            default:
+            {}  break;
+        }
+    }
+
+private:
+    WideParams parameters_;
 };
 
 
@@ -708,6 +838,16 @@ private:
         {
             std::shared_ptr<Layout> layout;
             switch(type) {
+                case LayoutType::DYNAMIC:
+                {
+                    layout = std::shared_ptr<Layout>(new DynamicLayout(displays));
+                } break;
+
+                case LayoutType::WIDE:
+                {
+                    layout = std::shared_ptr<Layout>(new WideLayout(displays));
+                } break;
+
                 case LayoutType::PIP:
                 {
                     layout = std::shared_ptr<Layout>(new PiPLayout(displays));
