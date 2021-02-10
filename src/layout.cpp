@@ -192,8 +192,8 @@ void Layout::displayStateValues(std::map<std::string, bool> states) const
     win_flags |= ImGuiWindowFlags_NoBackground;
     win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - 300), 
-            main_viewport->GetWorkPos().y + 50), ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 25, 
+            main_viewport->GetWorkPos().y + 40), ImGuiCond_Always);
 
     if (startMenu(title, win_flags)) {
         std::map<std::string, bool>::iterator itr;
@@ -418,7 +418,7 @@ void Layout::displayPiPWindow(int width, int height, uint pip_id) const
     win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + (main_viewport->GetWorkSize().x - width-offset.x), 
-            main_viewport->GetWorkPos().y + (main_viewport->GetWorkSize().y - height-offset.y)), ImGuiCond_Once);
+            main_viewport->GetWorkPos().y + height-offset.y), ImGuiCond_Once);
 
     if (startMenu("Picture-in-Picture", win_flags)) {
         ImGui::Text("%s", title.c_str());
