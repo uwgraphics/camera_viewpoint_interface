@@ -9,6 +9,7 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/Int32.h>
 
 // OpenCV
 #include <opencv2/opencv.hpp>
@@ -143,6 +144,8 @@ void App::initializeROS(int argc, char *argv[])
     }
     grasper_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/grasper_state", 10, boost::bind(&App::grasperCallback, this, _1));
     clutching_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/clutching_state", 10, boost::bind(&App::clutchingCallback, this, _1));
+
+    frame_mode_pub = n.advertise<std_msgs::Int32>("/relaxed_ik/frame_mode", 1000);
 }
 
 bool App::initializeGlfw()
@@ -428,7 +431,7 @@ void App::handleDisplayImageQueue()
 }
 
 
-// -- ROS Callbacks --
+// -- ROS Handling --
 void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id)
 {
     cv_bridge::CvImageConstPtr cur_img;
@@ -458,6 +461,16 @@ void App::clutchingCallback(const std_msgs::BoolConstPtr& msg)
 {
     layouts.setClutchingState(msg->data);
 }
+
+void App::publishFrameMode()
+{
+    int frame_mode = (int)layouts.getFrameMode();
+
+    std_msgs::Int32 mode_num;
+    mode_num.data = frame_mode;
+    frame_mode_pub.publish(mode_num);
+}
+
 
 int App::run(int argc, char *argv[])
 {
@@ -493,6 +506,7 @@ int App::run(int argc, char *argv[])
         // ImGui::ShowDemoWindow();
 
         layouts.draw();
+        publishFrameMode();
         
         handleDisplayImageQueue();
 

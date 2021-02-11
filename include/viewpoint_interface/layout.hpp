@@ -105,6 +105,12 @@ enum class LayoutDisplayRole
     Secondary
 };
 
+enum FrameMode
+{
+    CAMERA_FRAME = 0,
+    WORLD_FRAME
+};
+
 struct DisplayImageRequest
 {
     std::vector<uchar> &data;
@@ -145,6 +151,7 @@ public:
 
     void setGrabbingState(bool state) { grabbing_ = state; }
     void setClutchingState(bool state) { clutching_ = state; }
+    FrameMode getFrameMode() { return frame_mode_; }
     std::vector<DisplayImageRequest>& getImageRequestQueue();
     void pushImageResponse(const DisplayImageResponse &response);
 
@@ -195,6 +202,7 @@ protected:
     std::vector<DisplayImageResponse> image_response_queue_;
 
     bool grabbing_, clutching_;
+    FrameMode frame_mode_;
 
     std::vector<uint> primary_displays_; // Stores display ID
     std::vector<uint> secondary_displays_; // Stores display ID
@@ -212,7 +220,8 @@ protected:
     const ImVec4 kOnColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
     const ImVec4 kOffColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
 
-    Layout(LayoutType type, DisplayManager &disp) : layout_type_(type), displays_(disp)
+    Layout(LayoutType type, DisplayManager &disp) : layout_type_(type), displays_(disp),
+            frame_mode_(FrameMode::CAMERA_FRAME)
     {
         primary_color_.base =    ImVec4{10.0/255, 190.0/255, 10.0/255, 150.0/255};
         primary_color_.hovered = ImVec4{10.0/255, 190.0/255, 10.0/255, 200.0/255}; 
@@ -280,9 +289,10 @@ class DynamicLayout : public Layout
 {
 public:
     DynamicLayout(DisplayManager &displays, DynamicParams params=DynamicParams()) : 
-            Layout(LayoutType::DYNAMIC, displays), parameters_(params) 
+            Layout(LayoutType::DYNAMIC, displays), parameters_(params)
     {
         addPrimaryDisplayByIx(parameters_.primary_display);
+        frame_mode_ = FrameMode::CAMERA_FRAME;
     }
 
     virtual void displayLayoutParams() override
@@ -347,6 +357,7 @@ public:
             Layout(LayoutType::WIDE, displays), parameters_(params) 
     {
         addPrimaryDisplayByIx(parameters_.primary_display);
+        frame_mode_ = FrameMode::WORLD_FRAME;
     }
 
     virtual void displayLayoutParams() override
@@ -401,6 +412,7 @@ private:
 
 struct PiPParams
 {
+    FrameMode starting_frame = FrameMode::CAMERA_FRAME;
     uint start_primary_display = 0;
     uint start_pip_display = 1;
     uint max_num_displays = 3;
@@ -421,6 +433,7 @@ public:
 
         addPrimaryDisplayByIx(parameters_.start_primary_display);
         secondary_displays_.push_back(displays.getDisplayId(parameters_.start_pip_display));
+        frame_mode_ = parameters_.starting_frame;
     }
 
     virtual void displayLayoutParams() override
@@ -588,6 +601,7 @@ private:
 
 struct TimedPiPParams
 {
+    FrameMode starting_frame = FrameMode::CAMERA_FRAME;
     uint start_primary_display = 0;
     uint start_pip_display = 1;
     uint max_num_displays = 3;
@@ -609,6 +623,7 @@ public:
 
         addPrimaryDisplayByIx(parameters_.start_primary_display);
         secondary_displays_.push_back(displays.getDisplayId(parameters_.start_pip_display));
+        frame_mode_ = parameters_.starting_frame;
     }
 
     virtual void displayLayoutParams() override
@@ -796,6 +811,7 @@ private:
 
 struct SplitParams
 {
+    FrameMode starting_frame = FrameMode::CAMERA_FRAME;
     uint first_primary_display = 0;
     uint second_primary_display = 1;
 };
@@ -809,6 +825,7 @@ public:
     {
         addPrimaryDisplayByIx(parameters_.first_primary_display);
         addPrimaryDisplayByIx(parameters_.second_primary_display);
+        frame_mode_ = parameters_.starting_frame;
     }
 
     virtual void displayLayoutParams() override
@@ -861,6 +878,7 @@ private:
 
 struct TwinnedParams
 {
+    FrameMode starting_frame = FrameMode::CAMERA_FRAME;
     uint primary_display = 0;
 };
 
@@ -871,6 +889,7 @@ public:
             Layout(LayoutType::TWINNED, displays), parameters_(params) 
     {
         addPrimaryDisplayByIx(parameters_.primary_display);
+        frame_mode_ = parameters_.starting_frame;
     }
 
     virtual void displayLayoutParams() override
@@ -908,18 +927,24 @@ public:
         }
     }
 
+    void nextDisplayAndFrame() {
+        toNextDisplay(0, LayoutDisplayRole::Primary);
+        if (frame_mode_ == FrameMode::CAMERA_FRAME) {
+            frame_mode_ = FrameMode::WORLD_FRAME;
+        }
+        else if (frame_mode_ == FrameMode::WORLD_FRAME) {
+            frame_mode_ = FrameMode::CAMERA_FRAME;
+        }
+    }
+
     virtual void handleKeyInput(int key, int action, int mods) override
     {
         if (action == GLFW_PRESS) {
             switch (key) {
                 case GLFW_KEY_RIGHT:
-                {
-                    toNextDisplay(0, LayoutDisplayRole::Primary);
-                } break;
-
                 case GLFW_KEY_LEFT:
                 {
-                    toPrevDisplay(0, LayoutDisplayRole::Primary);
+                    nextDisplayAndFrame();
                 } break;
 
                 default:
@@ -937,7 +962,7 @@ public:
         {
             case LayoutCommand::TOGGLE:
             {
-                toNextDisplay(0, LayoutDisplayRole::Primary);
+                nextDisplayAndFrame();
             }   break;
 
             default:
@@ -960,6 +985,7 @@ private:
 
         void setGrabbingState(bool state) { active_layout->setGrabbingState(state); }
         void setClutchingState(bool state) { active_layout->setClutchingState(state); }
+        FrameMode getFrameMode() { return active_layout->getFrameMode(); }
 
         void toggleControlPanel()
         {
