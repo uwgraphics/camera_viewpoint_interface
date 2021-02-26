@@ -15,8 +15,9 @@
 
 #include "viewpoint_interface/shader.hpp"
 #include "viewpoint_interface/switch.hpp"
-#include "viewpoint_interface/layout.hpp"
 #include "viewpoint_interface/display.hpp"
+#include "viewpoint_interface/layout.hpp"
+#include "viewpoint_interface/layout_manager.hpp"
 #include "viewpoint_interface/scene_camera.hpp"
 
 
@@ -78,6 +79,7 @@ namespace viewpoint_interface
         ros::AsyncSpinner spinner;
         ros::Subscriber grasper_sub;
         ros::Subscriber clutching_sub;
+        ros::Subscriber collision_sub;
         ros::Publisher frame_mode_pub;
         std::vector<ros::Subscriber> disp_subs;
 
@@ -111,6 +113,7 @@ namespace viewpoint_interface
         void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint index);
         void grasperCallback(const std_msgs::BoolConstPtr& msg);
         void clutchingCallback(const std_msgs::BoolConstPtr& msg);
+        void collisionCallback(const std_msgs::StringConstPtr& msg);
         void publishFrameMode();
         static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);
         void handleDisplayImageQueue();

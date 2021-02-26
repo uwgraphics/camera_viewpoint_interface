@@ -10,6 +10,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Int32.h>
+#include <std_msgs/String.h>
 
 // OpenCV
 #include <opencv2/opencv.hpp>
@@ -144,6 +145,7 @@ void App::initializeROS(int argc, char *argv[])
     }
     grasper_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/grasper_state", 10, boost::bind(&App::grasperCallback, this, _1));
     clutching_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/clutching_state", 10, boost::bind(&App::clutchingCallback, this, _1));
+    collision_sub = n.subscribe<std_msgs::String>("/robot_out/collisions", 10, boost::bind(&App::collisionCallback, this, _1));
 
     frame_mode_pub = n.advertise<std_msgs::Int32>("/relaxed_ik/frame_mode", 1000);
 }
@@ -461,6 +463,12 @@ void App::clutchingCallback(const std_msgs::BoolConstPtr& msg)
 {
     layouts.setClutchingState(msg->data);
 }
+
+void App::collisionCallback(const std_msgs::StringConstPtr& msg)
+{
+    std::cout << msg->data << std::endl;
+}
+
 
 void App::publishFrameMode()
 {
