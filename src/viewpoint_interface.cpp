@@ -57,26 +57,14 @@ int main(int argc, char *argv[])
 
 
 // App init/shutdown
-bool App::parseCameraFile()
+bool App::parseCameraFile(std::string cam_config_data)
 {
-    std::ifstream cam_file;
-    std::stringstream config_data;
-    
-    cam_file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    try { 
-        cam_file.open(app_params.cam_config_file);
-        config_data << cam_file.rdbuf();
-        cam_file.close();
-    }
-    catch (std::ifstream::failure& e)
-    {
-        printText("Error reading camera config file: ", 0);
-        printText(e.what());
+    if (cam_config_data.empty()) {
+        printText("No camera config data.");
         return false;
     }
 
-
-    json j = json::parse(config_data.str());
+    json j = json::parse(cam_config_data);
 
     for (json::iterator it = j.begin(); it != j.end(); it++) {
         std::string int_name, ext_name, topic_name;
@@ -95,17 +83,20 @@ bool App::parseCameraFile()
     return true;
 }
 
-bool App::initialize(int argc, char *argv[])
+bool App::initialize()
 {
+    std::string cam_config_data;
+    n.getParam("cam_config_data", cam_config_data);
+
     // This must run first so that display settings are initialized
-    if (!parseCameraFile()) {
+    if (!parseCameraFile(cam_config_data)) {
         return false;
     } 
 
     if (!initializeSocket()) {
         return false;
     }
-    initializeROS(argc, argv);
+    initializeROS();
     if (!initializeGlfw()) {
         return false;
     }
@@ -134,7 +125,7 @@ bool App::initializeSocket()
     return true;
 }
 
-void App::initializeROS(int argc, char *argv[])
+void App::initializeROS()
 {
     spinner.start();
     
@@ -466,7 +457,7 @@ void App::clutchingCallback(const std_msgs::BoolConstPtr& msg)
 
 void App::collisionCallback(const std_msgs::StringConstPtr& msg)
 {
-    std::cout << msg->data << std::endl;
+    layouts.handleCollisionMessage(msg->data);
 }
 
 
@@ -482,7 +473,7 @@ void App::publishFrameMode()
 
 int App::run(int argc, char *argv[])
 {
-    if (!initialize(argc, argv)) {
+    if (!initialize()) {
         return -1;
     }
 

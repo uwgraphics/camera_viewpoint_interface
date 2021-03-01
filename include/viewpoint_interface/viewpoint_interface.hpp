@@ -48,7 +48,6 @@ namespace viewpoint_interface
         uint def_disp_width = 1280;
         uint def_disp_height = 720;
         uint def_disp_channels = 3;
-        std::string cam_config_file = "resources/config/cam_config.json";
         const std::string CONTR_NAME = "vive_controller";
     };
 
@@ -61,7 +60,7 @@ namespace viewpoint_interface
         static constexpr float WIDTH_FAC = 1.0f;
         static constexpr float HEIGHT_FAC = 1.0f;
 
-        App(AppParams params=AppParams()) : app_params(params), spinner(ros::AsyncSpinner(0)) {}
+        App(AppParams params=AppParams()) : n("~"), app_params(params), spinner(ros::AsyncSpinner(0)) {}
 
         int run(int argc, char *argv[]);
 
@@ -96,10 +95,10 @@ namespace viewpoint_interface
         };
 
         // General program flow
-        bool initialize(int argc, char *argv[]);
-        bool parseCameraFile();
+        bool initialize();
+        bool parseCameraFile(std::string cam_config_data);
         bool initializeSocket();
-        void initializeROS(int argc, char *argv[]);
+        void initializeROS();
         bool initializeGlfw();
         void initializeImGui();
         void shutdownApp();
