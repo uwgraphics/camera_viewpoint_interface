@@ -12,6 +12,7 @@
 
 #include "display.hpp"
 #include "timer.hpp"
+#include "scoreboard.hpp"
 
 
 namespace viewpoint_interface
@@ -195,6 +196,7 @@ public:
     }
 
     virtual void handleControllerInput(std::string input);
+    virtual void handleCollisionMessage(const std::string &message);
 
 protected:
     DisplayManager &displays_;
@@ -203,6 +205,7 @@ protected:
 
     bool grabbing_, clutching_;
     FrameMode frame_mode_;
+    Scoreboard scoreboard_;
 
     std::vector<uint> primary_displays_; // Stores display ID
     std::vector<uint> secondary_displays_; // Stores display ID

@@ -21,6 +21,7 @@ public:
 
     void setGrabbingState(bool state) { active_layout->setGrabbingState(state); }
     void setClutchingState(bool state) { active_layout->setClutchingState(state); }
+    void handleCollisionMessage(const std::string &message) { active_layout->handleCollisionMessage(message); }
     FrameMode getFrameMode() { return active_layout->getFrameMode(); }
 
     void toggleControlPanel()

@@ -88,6 +88,11 @@ void Layout::handleControllerInput(std::string input)
     }
 }
 
+void Layout::handleCollisionMessage(const std::string &message)
+{
+    // TODO: Implement this
+}
+
 
 // --- Protected ---
 

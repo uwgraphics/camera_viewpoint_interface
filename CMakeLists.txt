@@ -124,6 +124,7 @@ add_executable(viewpoint_interface
   src/viewpoint_interface.cpp
   src/timer.cpp
   src/layout.cpp
+  src/scoreboard.cpp
   src/glad.c
   src/imgui.cpp
   src/imgui_demo.cpp
