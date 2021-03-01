@@ -36,8 +36,8 @@ protected:
 class CountdownTimer : public Timer
 {
 public:
-    CountdownTimer(int time, DurationType type) : Timer(time, type), expired_(false),
-        acknowledged_(false) {}
+    CountdownTimer(int time, DurationType type=Timer::DurationType::SECONDS) : Timer(time, type), 
+        expired_(false), acknowledged_(false) {}
 
     void reset() override;
     bool timerExpired();
