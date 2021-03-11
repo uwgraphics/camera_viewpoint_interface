@@ -29,15 +29,21 @@ namespace viewpoint_interface
     struct DisplayInfo
     {
         std::vector<uchar> data;
+        std::vector<float> matrix;
         DisplayDims dimensions;
         std::string internal, external, topic;
         uint id;
 
         DisplayInfo(std::string &int_name, std::string &ext_name, std::string &topic_name,
                 DisplayDims dims) : internal(int_name), external(ext_name), topic(topic_name),
-                dimensions(dims) 
+                dimensions(dims), matrix(12, 0.0)
         {
             data.resize(dimensions.size());
+
+            // Set up identity matrix
+            matrix[0] = 1.0;
+            matrix[5] = 1.0;
+            matrix[10] = 1.0;       
         }
     };
 
@@ -57,6 +63,7 @@ namespace viewpoint_interface
         inline std::string getExternalName() const { return info.external; }
         inline std::string getTopicName() const { return info.topic; }
         inline std::vector<uchar>& getData() { return info.data; }
+        inline const std::vector<float>& getMatrix() const { return info.matrix; }
         inline const DisplayInfo& getDisplayInfo() const { return info; }
 
     private:
@@ -84,6 +91,11 @@ namespace viewpoint_interface
             info.data.assign(image.data, image.data + image.total()*image.channels());
         }
 
+        void copyMatrix(const std::vector<float> &matrix)
+        {
+            info.matrix = matrix;
+        }
+
         friend class DisplayManager;
     };
 
@@ -103,8 +115,9 @@ namespace viewpoint_interface
             num_active_displays++;
         }
 
-        bool isDisplayActive(uint ix) const { return displays[ix].isActive(); }
-        void activateDisplay(uint ix) 
+        bool isDisplayIxActive(uint ix) const { return displays[ix].isActive(); }
+        bool isDisplayIdActive(uint id) const { return displays.at(getDisplayIxById(id)).isActive(); }
+        void activateDisplay(uint ix)
         { 
             if (displays[ix].isActive()) {
                 return;
@@ -154,6 +167,11 @@ namespace viewpoint_interface
         {
             return displays[ix].getData();
         }
+
+        const std::vector<float>& getDisplayMatrix(uint ix) const
+        {
+            return displays[ix].getMatrix();
+        }
         
         const DisplayInfo& getDisplayInfo(uint ix) const
         { 
@@ -178,6 +196,11 @@ namespace viewpoint_interface
         std::vector<uchar>& getDisplayDataById(uint id)
         {
             return displays.at(getDisplayIxById(id)).getData();
+        }
+
+        const std::vector<float>& getDisplayMatrixById(uint id) const
+        {
+            return displays.at(getDisplayIxById(id)).getMatrix();
         }
 
         const DisplayInfo& getDisplayInfoById(uint id) const
@@ -205,7 +228,7 @@ namespace viewpoint_interface
             if (num_active_displays == 0) { return 0; }
 
             uint next_ix = nextIx(ix, displays.size());
-            while (!isDisplayActive(next_ix))
+            while (!isDisplayIxActive(next_ix))
             {
                 next_ix = nextIx(next_ix, displays.size());
             }
@@ -223,7 +246,7 @@ namespace viewpoint_interface
             if (num_active_displays == 0) { return 0; }
 
             uint prev_ix = prevIx(ix, displays.size());
-            while (!isDisplayActive(prev_ix))
+            while (!isDisplayIxActive(prev_ix))
             {
                 prev_ix = prevIx(prev_ix, displays.size());
             }
@@ -242,10 +265,16 @@ namespace viewpoint_interface
             std::iter_swap(vec.begin() + ix1, vec.begin() + ix2);
         }
 
-        void copyImageToDisplay(uint id, const cv::Mat &image)
+        void copyImageToDisplay(uint id, const cv::Mat& image)
         {
-            uint ix = getDisplayIxById(id);
+            uint ix(getDisplayIxById(id));
             displays[ix].copyImage(image);
+        }
+
+        void copyMatrixToDisplay(uint id, const std::vector<float>& matrix)
+        {
+            uint ix(getDisplayIxById(id));
+            displays[ix].copyMatrix(matrix); 
         }
 
 
