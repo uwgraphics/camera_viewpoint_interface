@@ -9,8 +9,8 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <std_msgs/Bool.h>
-#include <std_msgs/Int32.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Float32MultiArray.h>
 
 // OpenCV
 #include <opencv2/opencv.hpp>
@@ -66,7 +66,7 @@ bool App::parseCameraFile(std::string cam_config_data)
 
     json j = json::parse(cam_config_data);
 
-    for (json::iterator it = j.begin(); it != j.end(); it++) {
+    for (json::iterator it(j.begin()); it != j.end(); ++it) {
         std::string int_name, ext_name, topic_name;
         uint w, h, c;
 
@@ -129,16 +129,26 @@ void App::initializeROS()
 {
     spinner.start();
     
-    for (int i = 0; i < layouts.getNumTotalDisplays(); i++) {
+    // Init display image callbacks
+    for (int i = 0; i < layouts.getNumTotalDisplays(); ++i) {
         ros::Subscriber disp_sub(n.subscribe<sensor_msgs::Image>(layouts.getDisplayInfo(i).topic, 10, 
                 boost::bind(&App::cameraImageCallback, this, _1, layouts.getDisplayInfo(i).id)));
         disp_subs.push_back(disp_sub);
     }
+
+    // Init camera pose matrix callbacks
+    for (int i = 0; i < layouts.getNumTotalDisplays(); ++i) {
+        ros::Subscriber cam_matrix_sub(n.subscribe<std_msgs::Float32MultiArray>(layouts.getDisplayInfo(i).topic + "_matrix", 1, 
+                boost::bind(&App::cameraMatrixCallback, this, _1, layouts.getDisplayInfo(i).id)));
+        cam_matrix_subs.push_back(cam_matrix_sub);
+    }
+
     grasper_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/grasper_state", 10, boost::bind(&App::grasperCallback, this, _1));
     clutching_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/clutching_state", 10, boost::bind(&App::clutchingCallback, this, _1));
     collision_sub = n.subscribe<std_msgs::String>("/robot_out/collisions", 10, boost::bind(&App::collisionCallback, this, _1));
 
-    frame_mode_pub = n.advertise<std_msgs::Int32>("/relaxed_ik/frame_mode", 1000);
+    frame_matrix_pub = n.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/frame_matrix", 10);
+    display_bounds_pub = n.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/display_bounds", 10);
 }
 
 bool App::initializeGlfw()
@@ -295,7 +305,7 @@ void App::parseControllerInput(std::string data)
         return;
     }
 
-    for (json::iterator it = j.begin(); it != j.end(); it++) {
+    for (json::iterator it(j.begin()); it != j.end(); ++it) {
         AppCommand command(translateControllerInputToCommand(it.key()));
 
         switch (command)
@@ -384,22 +394,22 @@ void App::handleDisplayImageQueue()
 {
     static std::vector<uint> tex_ids;
 
-    std::vector<DisplayImageRequest> &queue = layouts.getImageRequestQueue();
+    std::vector<DisplayImageRequest> &queue(layouts.getImageRequestQueue());
 
     if (layouts.wasLayoutChanged()) {
         return;
     }
 
     if (queue.size() > tex_ids.size()) {
-        for (uint i = tex_ids.size(); i < queue.size(); i++) {
+        for (uint i = tex_ids.size(); i < queue.size(); ++i) {
             uint new_id = generateGLTextureId();
             tex_ids.push_back(new_id);
         }
     }
 
-    for (int i = 0; i < queue.size(); i++) {
+    for (int i = 0; i < queue.size(); ++i) {
         DisplayImageRequest &request(queue.at(i));
-        uint cur_id = tex_ids.at(i);
+        uint cur_id(tex_ids.at(i));
 
         int width, height, x, y;
         if (request.width == 0.0 || request.height == 0.0) {
@@ -445,6 +455,11 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id)
     layouts.forwardImageForDisplayId(id, unflipped_mat);
 }
 
+void App::cameraMatrixCallback(const std_msgs::Float32MultiArrayConstPtr& msg, uint id)
+{
+    return layouts.forwardMatrixForDisplayId(id, msg->data);
+}
+
 void App::grasperCallback(const std_msgs::BoolConstPtr& msg)
 {
     layouts.setGrabbingState(msg->data);
@@ -460,16 +475,33 @@ void App::collisionCallback(const std_msgs::StringConstPtr& msg)
     layouts.handleCollisionMessage(msg->data);
 }
 
-
-void App::publishFrameMode()
+void App::publishControlFrameMatrix()
 {
-    int frame_mode = (int)layouts.getFrameMode();
+    std_msgs::Float32MultiArray matrix_msg;
 
-    std_msgs::Int32 mode_num;
-    mode_num.data = frame_mode;
-    frame_mode_pub.publish(mode_num);
+    // TODO: Consider adding camera label to message
+    matrix_msg.data = layouts.getActiveDisplayMatrix();
+    frame_matrix_pub.publish(matrix_msg);
 }
 
+void App::publishDisplayBounds()
+{
+    std_msgs::Float32MultiArray bounds_msg;
+    bounds_msg.data = layouts.getDisplayBounds();
+    display_bounds_pub.publish(bounds_msg);
+}
+
+void App::publishDisplayData()
+{
+    ros::Rate loop_rate(app_params.loop_rate);
+    while (ros::ok() && !glfwWindowShouldClose(window))
+    {
+        publishControlFrameMatrix();
+        publishDisplayBounds();
+
+        loop_rate.sleep();
+    }
+}
 
 int App::run(int argc, char *argv[])
 {
@@ -492,6 +524,7 @@ int App::run(int argc, char *argv[])
 
 
     std::thread controller_input(&App::handleControllerInput, this);
+    std::thread publish_display_data(&App::publishDisplayData, this);
 
     ros::Rate loop_rate(app_params.loop_rate);
     while (ros::ok() && !glfwWindowShouldClose(window))
@@ -505,13 +538,12 @@ int App::run(int argc, char *argv[])
         // ImGui::ShowDemoWindow();
 
         layouts.draw();
-        publishFrameMode();
         
         handleDisplayImageQueue();
 
         // bg_shader.setBool("overlay_on", clutch_mode);
 
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // glBindVertexArray(img_surface.VAO);
@@ -528,6 +560,7 @@ int App::run(int argc, char *argv[])
     }
 
     controller_input.join();
+    publish_display_data.join();
     shutdownApp();
 
     return 0;

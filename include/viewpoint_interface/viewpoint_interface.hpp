@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #include "ros/ros.h"
 
@@ -79,8 +80,10 @@ namespace viewpoint_interface
         ros::Subscriber grasper_sub;
         ros::Subscriber clutching_sub;
         ros::Subscriber collision_sub;
-        ros::Publisher frame_mode_pub;
+        ros::Publisher frame_matrix_pub;
+        ros::Publisher display_bounds_pub;
         std::vector<ros::Subscriber> disp_subs;
+        std::vector<ros::Subscriber> cam_matrix_subs;
 
         // GUI
         GLFWwindow* window;
@@ -108,12 +111,15 @@ namespace viewpoint_interface
         const AppCommand translateControllerInputToCommand(std::string input) const;
         void parseControllerInput(std::string data);
         void handleControllerInput();
+        void publishDisplayData();
 
-        void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint index);
+        void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id);
+        void cameraMatrixCallback(const std_msgs::Float32MultiArrayConstPtr& msg, uint id);
         void grasperCallback(const std_msgs::BoolConstPtr& msg);
         void clutchingCallback(const std_msgs::BoolConstPtr& msg);
         void collisionCallback(const std_msgs::StringConstPtr& msg);
-        void publishFrameMode();
+        void publishControlFrameMatrix();
+        void publishDisplayBounds();
         static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);
         void handleDisplayImageQueue();
     };
