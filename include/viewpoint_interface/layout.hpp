@@ -87,7 +87,8 @@ enum LayoutType
     PIP,
     TIMED_PIP,
     SPLIT,
-    TWINNED
+    TWINNED,
+    GRID
 };
 
 enum LayoutCommand
@@ -106,11 +107,6 @@ enum class LayoutDisplayRole
     Secondary
 };
 
-enum FrameMode
-{
-    CAMERA_FRAME = 0,
-    WORLD_FRAME
-};
 
 struct DisplayImageRequest
 {
@@ -152,7 +148,8 @@ public:
 
     void setGrabbingState(bool state) { grabbing_ = state; }
     void setClutchingState(bool state) { clutching_ = state; }
-    FrameMode getFrameMode() { return frame_mode_; }
+    const std::vector<float>& getActiveDisplayMatrix() const;
+    const std::vector<float> getDisplayBounds() const;
     std::vector<DisplayImageRequest>& getImageRequestQueue();
     void pushImageResponse(const DisplayImageResponse &response);
 
@@ -200,16 +197,19 @@ public:
 
 protected:
     DisplayManager &displays_;
+    uint active_window_ix_;
     std::vector<DisplayImageRequest> display_image_queue_;
     std::vector<DisplayImageResponse> image_response_queue_;
-
-    bool grabbing_, clutching_;
-    FrameMode frame_mode_;
     Scoreboard scoreboard_;
+
+    // States
+    bool grabbing_, clutching_;
+
 
     std::vector<uint> primary_displays_; // Stores display ID
     std::vector<uint> secondary_displays_; // Stores display ID
-    std::vector<uint> prim_img_ids_; // Stores OpenGL ID for primary images
+    std::vector<uint> primary_img_ids_; // Stores OpenGL ID for primary display images
+    std::vector<uint> secondary_img_ids_; // Stores OpenGL ID for secondary display images
 
     struct ColorSet
     {
@@ -222,9 +222,12 @@ protected:
 
     const ImVec4 kOnColor = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
     const ImVec4 kOffColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+    const ImVec4 kActiveBorderColor = ImVec4(30.0/255, 225.0/255, 0.0f, 0.5f);
+
+    std::vector<float> dummyMatrix;
 
     Layout(LayoutType type, DisplayManager &disp) : layout_type_(type), displays_(disp),
-            frame_mode_(FrameMode::CAMERA_FRAME)
+            active_window_ix_(0), dummyMatrix(12, 0.0)
     {
         primary_color_.base =    ImVec4{10.0/255, 190.0/255, 10.0/255, 150.0/255};
         primary_color_.hovered = ImVec4{10.0/255, 190.0/255, 10.0/255, 200.0/255}; 
@@ -233,14 +236,21 @@ protected:
         secondary_color_.base =      ImVec4{165.0/255, 100.0/255, 100.0/255, 125.0/255};
         secondary_color_.hovered =   ImVec4{165.0/255, 100.0/255, 100.0/255, 200.0/255}; 
         secondary_color_.active =    ImVec4{165.0/255, 100.0/255, 100.0/255, 255.0/255};
+
+        // Set up identity matrix
+        dummyMatrix[0] = 1.0;
+        dummyMatrix[5] = 1.0;
+        dummyMatrix[10] = 1.0;
     }
         
-    virtual void handleImageResponse() = 0;
+    virtual void handleImageResponse();
 
     void enableDisplayStyle(LayoutDisplayRole role);
     void disableDisplayStyle();
-    void addPrimaryDisplayByIx(uint ix);
+    uint getPrimaryDisplayCount(bool include_inactive=false) const;
+    void addDisplayByIxAndRole(uint ix, LayoutDisplayRole role);
     void addPrimaryDisplayById(uint id);
+    void addSecondaryDisplayById(uint id);
     void toNextDisplay(uint vec_ix, LayoutDisplayRole role);
     void toPrevDisplay(uint vec_ix, LayoutDisplayRole role);
     void addImageRequestToQueue(DisplayImageRequest request);
@@ -249,21 +259,24 @@ protected:
     void drawDisplaysList();
     void drawDisplaySelector(uint num, std::string title="", LayoutDisplayRole role=LayoutDisplayRole::Primary);
     void drawDraggableRing();
+    void getDisplayPositionAndSize(uint cur_display, uint num_displays, float &x_pos, float &y_pos, 
+        float &width, float &height) const;
     void displayPrimaryWindows() const;
-    void displayPiPWindow(int width, int height, uint pip_id) const;
+    void displayPiPWindow(int width, int height) const;
     void drawCarouselMenu() const;
 
 private:
-    static const uint kNumLayoutTypes = 6;
+    static const uint kNumLayoutTypes = 7;
     const std::vector<std::string> kLayoutNames = {
-        "Dynamic Camera", "Wide Angle", "Picture-in-Picture", "Timed Pic-in-Pic", "Split Screen", "Twinned"
+        "Dynamic Camera", "Wide Angle", "Picture-in-Picture", "Timed Pic-in-Pic", "Split Screen",
+        "Twinned", "Grid"
     };
 
     LayoutType layout_type_;
 
     std::vector<uint> &getDisplaysVectorFromRole(LayoutDisplayRole role);
 };
-    
+
 
 class InactiveLayout : public Layout
 {
