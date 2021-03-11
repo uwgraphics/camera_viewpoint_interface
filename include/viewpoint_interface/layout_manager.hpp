@@ -8,6 +8,7 @@
 #include "viewpoint_interface/layouts/timed_pip.hpp"
 #include "viewpoint_interface/layouts/split.hpp"
 #include "viewpoint_interface/layouts/twinned.hpp"
+#include "viewpoint_interface/layouts/grid.hpp"
 
 namespace viewpoint_interface
 {
@@ -22,7 +23,8 @@ public:
     void setGrabbingState(bool state) { active_layout->setGrabbingState(state); }
     void setClutchingState(bool state) { active_layout->setClutchingState(state); }
     void handleCollisionMessage(const std::string &message) { active_layout->handleCollisionMessage(message); }
-    FrameMode getFrameMode() { return active_layout->getFrameMode(); }
+    const std::vector<float>& getActiveDisplayMatrix() const { return active_layout->getActiveDisplayMatrix(); }
+    const std::vector<float> getDisplayBounds() const { return active_layout->getDisplayBounds(); }
 
     void toggleControlPanel()
     {
@@ -74,6 +76,11 @@ public:
     void forwardImageForDisplayId(uint id, const cv::Mat &image)
     {
         displays.copyImageToDisplay(id, image);
+    }
+
+    void forwardMatrixForDisplayId(uint id, const std::vector<float> &matrix)
+    {
+        displays.copyMatrixToDisplay(id, matrix);
     }
 
     bool wasLayoutChanged() const
@@ -138,6 +145,11 @@ private:
             case LayoutType::TWINNED:
             {
                 layout = std::shared_ptr<Layout>(new TwinnedLayout(displays));
+            } break;
+
+            case LayoutType::GRID:
+            {
+                layout = std::shared_ptr<Layout>(new GridLayout(displays));
             } break;
 
             default: 
