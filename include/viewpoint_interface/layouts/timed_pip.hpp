@@ -8,7 +8,6 @@ namespace viewpoint_interface
 
 struct TimedPiPParams
 {
-    FrameMode starting_frame = FrameMode::CAMERA_FRAME;
     uint start_primary_display = 0;
     uint start_pip_display = 1;
     uint max_num_displays = 3;
@@ -28,9 +27,8 @@ public:
             parameters_.max_num_displays = displays.size();
         }
 
-        addPrimaryDisplayByIx(parameters_.start_primary_display);
-        secondary_displays_.push_back(displays.getDisplayId(parameters_.start_pip_display));
-        frame_mode_ = parameters_.starting_frame;
+        addDisplayByIxAndRole(parameters_.start_primary_display, LayoutDisplayRole::Primary);
+        addDisplayByIxAndRole(parameters_.start_pip_display, LayoutDisplayRole::Secondary);
     }
 
     virtual void displayLayoutParams() override
@@ -120,32 +118,12 @@ public:
         }
 
         if (pip_enabled_) {
-            displayPiPWindow(parameters_.pip_window_dims[0], parameters_.pip_window_dims[1], pip_id_);
+            displayPiPWindow(parameters_.pip_window_dims[0], parameters_.pip_window_dims[1]);
 
             std::vector<uchar> &sec_data = displays_.getDisplayDataById(secondary_displays_[0]);
             const DisplayInfo &sec_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
             addImageRequestToQueue(DisplayImageRequest{sec_info.dimensions.width, sec_info.dimensions.height, 
                     sec_data, 0, LayoutDisplayRole::Secondary});
-        }
-    }
-
-    virtual void handleImageResponse() override
-    {
-        for (int i = 0; i < image_response_queue_.size(); i++) {
-            DisplayImageResponse &response(image_response_queue_.at(i));
-
-            switch (response.role)
-            {
-                case LayoutDisplayRole::Primary:
-                {
-                    prim_img_ids_[response.index] = response.id;
-                }   break;
-
-                case LayoutDisplayRole::Secondary:
-                {
-                    pip_id_ = response.id;
-                }   break;
-            }
         }
     }
 
@@ -210,7 +188,6 @@ public:
 private:
     TimedPiPParams parameters_;
     
-    uint pip_id_;
     bool keep_aspect_ratio_, pip_enabled_;
     CountdownTimer countdown_;
 };

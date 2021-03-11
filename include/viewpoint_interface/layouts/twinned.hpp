@@ -8,7 +8,6 @@ namespace viewpoint_interface
 
 struct TwinnedParams
 {
-    FrameMode starting_frame = FrameMode::CAMERA_FRAME;
     uint primary_display = 0;
 };
 
@@ -18,8 +17,7 @@ public:
     TwinnedLayout(DisplayManager &displays, TwinnedParams params=TwinnedParams()) : 
             Layout(LayoutType::TWINNED, displays), parameters_(params) 
     {
-        addPrimaryDisplayByIx(parameters_.primary_display);
-        frame_mode_ = parameters_.starting_frame;
+        addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
     }
 
     virtual void displayLayoutParams() override
@@ -49,22 +47,8 @@ public:
                 prim_data, (uint)0, LayoutDisplayRole::Primary});           
     }
 
-    virtual void handleImageResponse() override
-    {
-        for (int i = 0; i < image_response_queue_.size(); i++) {
-            DisplayImageResponse &response(image_response_queue_.at(i));
-            prim_img_ids_[response.index] = response.id;
-        }
-    }
-
     void nextDisplayAndFrame() {
         toNextDisplay(0, LayoutDisplayRole::Primary);
-        if (frame_mode_ == FrameMode::CAMERA_FRAME) {
-            frame_mode_ = FrameMode::WORLD_FRAME;
-        }
-        else if (frame_mode_ == FrameMode::WORLD_FRAME) {
-            frame_mode_ = FrameMode::CAMERA_FRAME;
-        }
     }
 
     virtual void handleKeyInput(int key, int action, int mods) override

@@ -8,7 +8,6 @@ namespace viewpoint_interface
 
 struct SplitParams
 {
-    FrameMode starting_frame = FrameMode::CAMERA_FRAME;
     uint first_primary_display = 0;
     uint second_primary_display = 1;
 };
@@ -20,9 +19,8 @@ public:
     SplitLayout(DisplayManager &displays, SplitParams params=SplitParams()) : Layout(LayoutType::SPLIT, displays),
             parameters_(params) 
     {
-        addPrimaryDisplayByIx(parameters_.first_primary_display);
-        addPrimaryDisplayByIx(parameters_.second_primary_display);
-        frame_mode_ = parameters_.starting_frame;
+        addDisplayByIxAndRole(parameters_.first_primary_display, LayoutDisplayRole::Primary);
+        addDisplayByIxAndRole(parameters_.second_primary_display, LayoutDisplayRole::Primary);
     }
 
     virtual void displayLayoutParams() override
@@ -59,13 +57,23 @@ public:
         }
     }
 
-    virtual void handleImageResponse() override
+    void toNextActiveWindow()
     {
-        for (int i = 0; i < image_response_queue_.size(); i++) {
-            DisplayImageResponse &response(image_response_queue_.at(i));
-            prim_img_ids_[response.index] = response.id;
+        ++active_window_ix_ %= 2;
+    }
+
+    virtual void handleKeyInput(int key, int action, int mods) override
+    {
+        if (action == GLFW_PRESS) {
+            switch (key) {
+                case GLFW_KEY_TAB:
+                {
+                    toNextActiveWindow();
+                }   break;
+            }
         }
     }
+
 
 private:
     SplitParams parameters_;

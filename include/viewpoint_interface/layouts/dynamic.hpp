@@ -17,8 +17,7 @@ public:
     DynamicLayout(DisplayManager &displays, DynamicParams params=DynamicParams()) : 
             Layout(LayoutType::DYNAMIC, displays), parameters_(params)
     {
-        addPrimaryDisplayByIx(parameters_.primary_display);
-        frame_mode_ = FrameMode::CAMERA_FRAME;
+        addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
     }
 
     virtual void displayLayoutParams() override
@@ -45,14 +44,6 @@ public:
         const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
         addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
                 prim_data, (uint)0, LayoutDisplayRole::Primary});           
-    }
-
-    virtual void handleImageResponse() override
-    {
-        for (int i = 0; i < image_response_queue_.size(); i++) {
-            DisplayImageResponse &response(image_response_queue_.at(i));
-            prim_img_ids_[response.index] = response.id;
-        }
     }
 
     virtual void handleControllerInput(std::string input) override
