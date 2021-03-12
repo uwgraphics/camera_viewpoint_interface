@@ -14,6 +14,15 @@ const std::string Layout::getLayoutName() const
     return kLayoutNames[(uint)layout_type_];
 }
 
+void Layout::setActiveWindow(uint index)
+{
+    if (index >= getPrimaryDisplayCount(false)) {
+        return;
+    }
+
+    active_window_ix_ = index;
+}
+
 const std::vector<float>& Layout::getActiveDisplayMatrix() const
 {
     if (primary_displays_.empty()) {
@@ -79,6 +88,16 @@ void Layout::handleKeyInput(int key, int action, int mods)
                 toNextDisplay(0, LayoutDisplayRole::Secondary);
             }   break;
 
+            case GLFW_KEY_TAB:
+            {
+                if (mods && GLFW_MOD_SHIFT) {
+                    toPrevActiveWindow();
+                }
+                else {
+                    toNextActiveWindow();
+                }
+            }   break;
+
             default:
             {
             } break;
@@ -110,6 +129,16 @@ void Layout::handleControllerInput(std::string input)
         case LayoutCommand::SECONDARY_PREV:
         {
             toPrevDisplay(0, LayoutDisplayRole::Secondary);
+        }   break;
+
+        case LayoutCommand::ACTIVE_WINDOW_NEXT:
+        {
+            toNextActiveWindow();
+        }   break;
+
+        case LayoutCommand::ACTIVE_WINDOW_PREV:
+        {
+            toPrevActiveWindow();
         }   break;
 
         default:
@@ -248,6 +277,29 @@ void Layout::toPrevDisplay(uint vec_ix, LayoutDisplayRole role)
     uint cur_ix = displays_.getDisplayIxById(role_vec.at(vec_ix));
     uint prev_ix = displays_.getPrevActiveDisplayIx(cur_ix);
     role_vec[vec_ix] = displays_.getDisplayId(prev_ix);
+}
+
+void Layout::toNextActiveWindow()
+{
+    uint window_count(getPrimaryDisplayCount(false));
+
+    if (window_count == 0) { return; }
+
+    ++active_window_ix_ %= window_count;
+}
+
+void Layout::toPrevActiveWindow()
+{
+    uint window_count(getPrimaryDisplayCount(false));
+
+    if (window_count == 0) { return; }
+
+    if (active_window_ix_ == 0) {
+        active_window_ix_ = window_count - 1;
+    }
+    else {
+        --active_window_ix_;
+    }
 }
 
 void Layout::addImageRequestToQueue(DisplayImageRequest request)

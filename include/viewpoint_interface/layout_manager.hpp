@@ -22,7 +22,8 @@ public:
 
     void setGrabbingState(bool state) { active_layout->setGrabbingState(state); }
     void setClutchingState(bool state) { active_layout->setClutchingState(state); }
-    void handleCollisionMessage(const std::string &message) { active_layout->handleCollisionMessage(message); }
+    void handleCollisionMessage(const std::string& message) { active_layout->handleCollisionMessage(message); }
+    void setActiveWindow(const uint& index) { active_layout->setActiveWindow(index); }
     const std::vector<float>& getActiveDisplayMatrix() const { return active_layout->getActiveDisplayMatrix(); }
     const std::vector<float> getDisplayBounds() const { return active_layout->getDisplayBounds(); }
 

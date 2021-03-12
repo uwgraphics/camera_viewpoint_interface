@@ -77,9 +77,10 @@ namespace viewpoint_interface
         // ROS
         ros::NodeHandle n;
         ros::AsyncSpinner spinner;
-        ros::Subscriber grasper_sub;
+        ros::Subscriber grasping_sub;
         ros::Subscriber clutching_sub;
         ros::Subscriber collision_sub;
+        ros::Subscriber active_display_sub;
         ros::Publisher frame_matrix_pub;
         ros::Publisher display_bounds_pub;
         std::vector<ros::Subscriber> disp_subs;
@@ -115,9 +116,10 @@ namespace viewpoint_interface
 
         void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id);
         void cameraMatrixCallback(const std_msgs::Float32MultiArrayConstPtr& msg, uint id);
-        void grasperCallback(const std_msgs::BoolConstPtr& msg);
+        void graspingCallback(const std_msgs::BoolConstPtr& msg);
         void clutchingCallback(const std_msgs::BoolConstPtr& msg);
         void collisionCallback(const std_msgs::StringConstPtr& msg);
+        void activeDisplayCallback(const std_msgs::UInt8ConstPtr& msg);
         void publishControlFrameMatrix();
         void publishDisplayBounds();
         static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);

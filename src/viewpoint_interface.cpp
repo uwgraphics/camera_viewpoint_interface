@@ -10,6 +10,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/String.h>
+#include <std_msgs/UInt8.h>
 #include <std_msgs/Float32MultiArray.h>
 
 // OpenCV
@@ -131,7 +132,7 @@ void App::initializeROS()
     
     // Init display image callbacks
     for (int i = 0; i < layouts.getNumTotalDisplays(); ++i) {
-        ros::Subscriber disp_sub(n.subscribe<sensor_msgs::Image>(layouts.getDisplayInfo(i).topic, 10, 
+        ros::Subscriber disp_sub(n.subscribe<sensor_msgs::Image>(layouts.getDisplayInfo(i).topic, 5, 
                 boost::bind(&App::cameraImageCallback, this, _1, layouts.getDisplayInfo(i).id)));
         disp_subs.push_back(disp_sub);
     }
@@ -143,9 +144,11 @@ void App::initializeROS()
         cam_matrix_subs.push_back(cam_matrix_sub);
     }
 
-    grasper_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/grasper_state", 10, boost::bind(&App::grasperCallback, this, _1));
-    clutching_sub = n.subscribe<std_msgs::Bool>("/relaxed_ik/clutching_state", 10, boost::bind(&App::clutchingCallback, this, _1));
-    collision_sub = n.subscribe<std_msgs::String>("/robot_out/collisions", 10, boost::bind(&App::collisionCallback, this, _1));
+    grasping_sub = n.subscribe<std_msgs::Bool>("/robot_state/grasping", 10, boost::bind(&App::graspingCallback, this, _1));
+    clutching_sub = n.subscribe<std_msgs::Bool>("/robot_state/clutching", 10, boost::bind(&App::clutchingCallback, this, _1));
+    collision_sub = n.subscribe<std_msgs::String>("/robot_state/collisions", 10, boost::bind(&App::collisionCallback, this, _1));
+    active_display_sub = n.subscribe<std_msgs::UInt8>("/viewpoint_interface/active_display", 10, 
+            boost::bind(&App::activeDisplayCallback, this, _1));
 
     frame_matrix_pub = n.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/frame_matrix", 10);
     display_bounds_pub = n.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/display_bounds", 10);
@@ -460,7 +463,7 @@ void App::cameraMatrixCallback(const std_msgs::Float32MultiArrayConstPtr& msg, u
     return layouts.forwardMatrixForDisplayId(id, msg->data);
 }
 
-void App::grasperCallback(const std_msgs::BoolConstPtr& msg)
+void App::graspingCallback(const std_msgs::BoolConstPtr& msg)
 {
     layouts.setGrabbingState(msg->data);
 }
@@ -473,6 +476,11 @@ void App::clutchingCallback(const std_msgs::BoolConstPtr& msg)
 void App::collisionCallback(const std_msgs::StringConstPtr& msg)
 {
     layouts.handleCollisionMessage(msg->data);
+}
+
+void App::activeDisplayCallback(const std_msgs::UInt8ConstPtr& msg)
+{
+    layouts.setActiveWindow(msg->data);
 }
 
 void App::publishControlFrameMatrix()

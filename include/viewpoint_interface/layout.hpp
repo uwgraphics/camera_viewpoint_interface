@@ -98,7 +98,9 @@ enum LayoutCommand
     PRIMARY_PREV,
     SECONDARY_NEXT,
     SECONDARY_PREV,
-    TOGGLE
+    TOGGLE,
+    ACTIVE_WINDOW_NEXT,
+    ACTIVE_WINDOW_PREV
 };
 
 enum class LayoutDisplayRole
@@ -148,6 +150,7 @@ public:
 
     void setGrabbingState(bool state) { grabbing_ = state; }
     void setClutchingState(bool state) { clutching_ = state; }
+    void setActiveWindow(uint index);
     const std::vector<float>& getActiveDisplayMatrix() const;
     const std::vector<float> getDisplayBounds() const;
     std::vector<DisplayImageRequest>& getImageRequestQueue();
@@ -187,6 +190,12 @@ public:
         }
         else if (input == "toggle") {
             return LayoutCommand::TOGGLE;
+        }
+        else if (input == "active_next") {
+            return LayoutCommand::ACTIVE_WINDOW_NEXT;
+        }
+        else if (input == "active_prev") {
+            return LayoutCommand::ACTIVE_WINDOW_PREV;
         }
 
         return LayoutCommand::INVALID_COMMAND;
@@ -253,6 +262,8 @@ protected:
     void addSecondaryDisplayById(uint id);
     void toNextDisplay(uint vec_ix, LayoutDisplayRole role);
     void toPrevDisplay(uint vec_ix, LayoutDisplayRole role);
+    void toNextActiveWindow();
+    void toPrevActiveWindow();
     void addImageRequestToQueue(DisplayImageRequest request);
     void displayInstructionsWindow(std::string text) const;
     void displayStateValues(std::map<std::string, bool> states) const;
