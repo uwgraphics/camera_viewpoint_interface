@@ -57,24 +57,6 @@ public:
         }
     }
 
-    void toNextActiveWindow()
-    {
-        ++active_window_ix_ %= 2;
-    }
-
-    virtual void handleKeyInput(int key, int action, int mods) override
-    {
-        if (action == GLFW_PRESS) {
-            switch (key) {
-                case GLFW_KEY_TAB:
-                {
-                    toNextActiveWindow();
-                }   break;
-            }
-        }
-    }
-
-
 private:
     SplitParams parameters_;
 };

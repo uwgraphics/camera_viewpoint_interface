@@ -47,23 +47,6 @@ public:
         }
     }
 
-    void toNextActiveWindow()
-    {
-        ++active_window_ix_ %= displays_.size();
-    }
-
-    virtual void handleKeyInput(int key, int action, int mods) override
-    {
-        if (action == GLFW_PRESS) {
-            switch (key) {
-                case GLFW_KEY_TAB:
-                {
-                    toNextActiveWindow();
-                }   break;
-            }
-        }
-    }
-
 private:
     GridParams parameters_;
 };
