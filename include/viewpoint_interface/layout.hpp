@@ -10,6 +10,7 @@
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
 
+#include "layout_component.hpp"
 #include "display.hpp"
 #include "timer.hpp"
 #include "scoreboard.hpp"
@@ -41,8 +42,8 @@ static void endMenu()
 template <typename T>
 int getItemIndexInVector(T item, std::vector<T> &vec)
 {
-    auto iter = std::find(vec.begin(), vec.end(), item);
-    if(iter != vec.end()) {
+    auto iter(std::find(vec.begin(), vec.end(), item));
+    if (iter != vec.end()) {
         return iter - vec.begin();
     }
 
@@ -52,8 +53,8 @@ int getItemIndexInVector(T item, std::vector<T> &vec)
 template <typename T>
 int getItemIndexInVector(T item, const std::vector<T> &vec)
 {
-    auto iter = std::find(vec.begin(), vec.end(), item);
-    if(iter != vec.end()) {
+    auto iter(std::find(vec.begin(), vec.end(), item));
+    if (iter != vec.end()) {
         return iter - vec.begin();
     }
 
@@ -88,7 +89,8 @@ enum LayoutType
     TIMED_PIP,
     SPLIT,
     TWINNED,
-    GRID
+    GRID,
+    CAROUSEL
 };
 
 enum LayoutCommand
@@ -214,11 +216,12 @@ protected:
     // States
     bool grabbing_, clutching_;
 
-
     std::vector<uint> primary_displays_; // Stores display ID
     std::vector<uint> secondary_displays_; // Stores display ID
     std::vector<uint> primary_img_ids_; // Stores OpenGL ID for primary display images
     std::vector<uint> secondary_img_ids_; // Stores OpenGL ID for secondary display images
+
+    std::vector<LayoutComponent> layout_components_;
 
     struct ColorSet
     {
@@ -233,10 +236,10 @@ protected:
     const ImVec4 kOffColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
     const ImVec4 kActiveBorderColor = ImVec4(30.0/255, 225.0/255, 0.0f, 0.5f);
 
-    std::vector<float> dummyMatrix;
+    std::vector<float> kDummyMatrix;
 
     Layout(LayoutType type, DisplayManager &disp) : layout_type_(type), displays_(disp),
-            active_window_ix_(0), dummyMatrix(12, 0.0)
+            active_window_ix_(0), kDummyMatrix(12, 0.0)
     {
         primary_color_.base =    ImVec4{10.0/255, 190.0/255, 10.0/255, 150.0/255};
         primary_color_.hovered = ImVec4{10.0/255, 190.0/255, 10.0/255, 200.0/255}; 
@@ -247,9 +250,9 @@ protected:
         secondary_color_.active =    ImVec4{165.0/255, 100.0/255, 100.0/255, 255.0/255};
 
         // Set up identity matrix
-        dummyMatrix[0] = 1.0;
-        dummyMatrix[5] = 1.0;
-        dummyMatrix[10] = 1.0;
+        kDummyMatrix[0] = 1.0;
+        kDummyMatrix[5] = 1.0;
+        kDummyMatrix[10] = 1.0;
     }
         
     virtual void handleImageResponse();
@@ -265,6 +268,10 @@ protected:
     void toNextActiveWindow();
     void toPrevActiveWindow();
     void addImageRequestToQueue(DisplayImageRequest request);
+    void addLayoutComponent(LayoutComponent::Type type, LayoutComponent::Spacing spacing=LayoutComponent::Spacing::Auto,
+        LayoutComponent::Positioning positioning=LayoutComponent::Positioning::Auto, float width=0.0, float height=0.0,
+        ImVec2 offset=ImVec2{-1.0, -1.0});
+    void drawLayoutComponents();
     void displayInstructionsWindow(std::string text) const;
     void displayStateValues(std::map<std::string, bool> states) const;
     void drawDisplaysList();
@@ -274,18 +281,20 @@ protected:
         float &width, float &height) const;
     void displayPrimaryWindows() const;
     void displayPiPWindow(int width, int height) const;
-    void drawCarouselMenu() const;
+    void displayCarouselRibbon() const;
 
 private:
-    static const uint kNumLayoutTypes = 7;
+    static const uint kNumLayoutTypes = 8;
     const std::vector<std::string> kLayoutNames = {
         "Dynamic Camera", "Wide Angle", "Picture-in-Picture", "Timed Pic-in-Pic", "Split Screen",
-        "Twinned", "Grid"
+        "Twinned", "Grid", "Carousel"
     };
 
     LayoutType layout_type_;
 
     std::vector<uint> &getDisplaysVectorFromRole(LayoutDisplayRole role);
+
+    friend class LayoutComponent;
 };
 
 
