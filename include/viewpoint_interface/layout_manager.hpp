@@ -9,6 +9,7 @@
 #include "viewpoint_interface/layouts/split.hpp"
 #include "viewpoint_interface/layouts/twinned.hpp"
 #include "viewpoint_interface/layouts/grid.hpp"
+#include "viewpoint_interface/layouts/carousel.hpp"
 
 namespace viewpoint_interface
 {
@@ -151,6 +152,11 @@ private:
             case LayoutType::GRID:
             {
                 layout = std::shared_ptr<Layout>(new GridLayout(displays));
+            } break;
+
+            case LayoutType::CAROUSEL:
+            {
+                layout = std::shared_ptr<Layout>(new CarouselLayout(displays));
             } break;
 
             default: 
