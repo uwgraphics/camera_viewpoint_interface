@@ -41,7 +41,7 @@ public:
 
         displayPrimaryWindows();
 
-        std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(0));
+        std::vector<uchar> &prim_data(displays_.getDisplayDataById(primary_displays_.at(0)));
         const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
         addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
                 prim_data, (uint)0, LayoutDisplayRole::Primary});           

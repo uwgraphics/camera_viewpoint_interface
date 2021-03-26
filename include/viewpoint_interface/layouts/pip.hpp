@@ -16,7 +16,7 @@ struct PiPParams
     int pip_aspect_ratio[2] = { 16, 9 };
 };
 
-class PiPLayout : public Layout
+class PiPLayout final : public Layout
 {
 public:
     PiPLayout(DisplayManager &displays, PiPParams params=PiPParams()) : Layout(LayoutType::PIP, displays),

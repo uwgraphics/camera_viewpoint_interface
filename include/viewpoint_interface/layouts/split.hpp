@@ -12,7 +12,7 @@ struct SplitParams
     uint second_primary_display = 1;
 };
 
-class SplitLayout : public Layout
+class SplitLayout final : public Layout
 {
 public:
 

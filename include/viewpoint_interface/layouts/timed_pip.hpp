@@ -16,7 +16,7 @@ struct TimedPiPParams
     int pip_aspect_ratio[2] = { 16, 9 };
 };
 
-class TimedPiPLayout : public Layout
+class TimedPiPLayout final : public Layout
 {
 public:
     TimedPiPLayout(DisplayManager &displays, TimedPiPParams params=TimedPiPParams()) : Layout(LayoutType::TIMED_PIP, displays),

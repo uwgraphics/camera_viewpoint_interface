@@ -11,7 +11,7 @@ struct WideParams
     uint primary_display = 1;
 };
 
-class WideLayout : public Layout
+class WideLayout final : public Layout
 {
 public:
     WideLayout(DisplayManager &displays, WideParams params=WideParams()) : 

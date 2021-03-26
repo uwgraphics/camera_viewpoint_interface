@@ -11,7 +11,7 @@ struct GridParams
 
 };
 
-class GridLayout : public Layout
+class GridLayout final : public Layout
 {
 public:
 

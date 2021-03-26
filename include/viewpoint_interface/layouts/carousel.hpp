@@ -1,23 +1,27 @@
-#ifndef __LAYOUT_DYNAMIC_HPP__
-#define __LAYOUT_DYNAMIC_HPP__
+#ifndef __LAYOUT_CAROUSEL_HPP__
+#define __LAYOUT_CAROUSEL_HPP__
 
 #include "viewpoint_interface/layout.hpp"
 
 namespace viewpoint_interface
 {
 
-struct DynamicParams
+struct CarouselParams
 {
     uint primary_display = 0;
 };
 
-class DynamicLayout final : public Layout
+class CarouselLayout final : public Layout
 {
 public:
-    DynamicLayout(DisplayManager &displays, DynamicParams params=DynamicParams()) : 
-            Layout(LayoutType::DYNAMIC, displays), parameters_(params)
+    CarouselLayout(DisplayManager &displays, CarouselParams params=CarouselParams()) : 
+            Layout(LayoutType::CAROUSEL, displays), parameters_(params) 
     {
         addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
+
+        for (int i = 0; i < displays.size(); ++i) {
+            addDisplayByIxAndRole(i, LayoutDisplayRole::Secondary);
+        }
     }
 
     virtual void displayLayoutParams() override
@@ -30,6 +34,7 @@ public:
     virtual void draw() override
     {
         addLayoutComponent(LayoutComponent::Type::Primary);
+        addLayoutComponent(LayoutComponent::Type::Carousel);
         drawLayoutComponents();
 
         std::map<std::string, bool> states;
@@ -38,21 +43,10 @@ public:
         displayStateValues(states);
     }
 
-    virtual void handleControllerInput(std::string input) override
-    {
-        LayoutCommand command(translateControllerInputToCommand(input));
-
-        switch(command)
-        {
-            default:
-            {}  break;
-        }
-    }
-
 private:
-    DynamicParams parameters_;
+    CarouselParams parameters_;
 };
 
 } // viewpoint_interface
 
-#endif //__LAYOUT_DYNAMIC_HPP__
+#endif //__LAYOUT_CAROUSEL_HPP__
