@@ -5,6 +5,67 @@
 namespace viewpoint_interface {
 
 // --- Public ---
+const std::vector<float> LayoutComponent::getDisplayBounds() const
+{
+    std::vector<float> bounds;
+
+    switch (type_)
+    {
+        case Type::Primary:
+        {
+            float x_pos, y_pos, width, height;
+            uint total_displays(layout_.getPrimaryDisplayCount(false));
+            for (uint i = 0; i < total_displays; ++i) {
+                getPrimaryDisplayPositionAndSize(i, total_displays, x_pos, y_pos, width, height);
+                
+                // Top left corner
+                bounds.push_back(x_pos); bounds.push_back(y_pos);
+                
+                // Bottom right corner
+                bounds.push_back(x_pos + width); bounds.push_back(y_pos + height);
+            }
+        }   break;
+    
+        case Type::Pic_In_Pic:
+        {
+            ImVec2 pos;
+            getPiPWindowPosition(pos);
+
+            // Top left corner
+            bounds.push_back(pos.x); bounds.push_back(pos.y);
+
+            // Bottom right corner
+            bounds.push_back(pos.x + width_); bounds.push_back(pos.y + height_);
+        }   break;
+    
+        case Type::Carousel:
+        {
+            ImVec2 ribbon_pos;
+            std::vector<ImVec4> display_dim_data;
+            getCarouselRibbonPosAndDisplaysPosAndSize(ribbon_pos, display_dim_data);
+
+            for (int i(0); i < display_dim_data.size(); ++i) {
+                float x_pos(ribbon_pos.x + display_dim_data[i].x);
+                float y_pos(ribbon_pos.y + display_dim_data[i].y);
+                
+                // Top left corner
+                bounds.push_back(x_pos);
+                bounds.push_back(y_pos);
+
+                // Bottom right corner
+                bounds.push_back(x_pos + display_dim_data[i].z);
+                bounds.push_back(y_pos + display_dim_data[i].w);
+            }
+        }   break;
+    
+        default:
+        {
+        }   break;
+    }
+
+    return bounds;
+}
+
 void LayoutComponent::draw()
 {
     switch (type_)
@@ -16,7 +77,7 @@ void LayoutComponent::draw()
     
         case Type::Pic_In_Pic:
         {
-
+            drawPiPWindow();
         }   break;
     
         case Type::Carousel:
@@ -44,31 +105,31 @@ void LayoutComponent::checkParameters()
             // every frame
 
             spacing_ = Spacing::Full;
-            positioning_ = Positioning::Full;
+            positioning_ = ComponentPositioning_Full;
         }   break;
         
         case Type::Pic_In_Pic:
         {
-            ImVec2 default_dims{400, 225};
-            ImVec2 default_offset{150, 150};
+            ImVec2 default_dims{400.0, 225.0};
+            ImVec2 default_offset{75.0, 75.0};
             // NOTE: The offset indicates how far to be from the edges of
             // the screen, not the absolute position of the window
 
             spacing_ = Spacing::Floating;
 
-            if (positioning_ != Positioning::Top_Left &&
-                    positioning_ != Positioning::Top_Right &&
-                    positioning_ != Positioning::Bottom_Left &&
-                    positioning_ != Positioning::Bottom_Right) {
-                if (positioning_ == Positioning::Bottom) {
-                    positioning_ = Positioning::Bottom_Right;
+            if (positioning_ != ComponentPositioning_Top_Left &&
+                    positioning_ != ComponentPositioning_Top_Right &&
+                    positioning_ != ComponentPositioning_Bottom_Left &&
+                    positioning_ != ComponentPositioning_Bottom_Right) {
+                if (positioning_ == ComponentPositioning_Bottom) {
+                    positioning_ = ComponentPositioning_Bottom_Right;
                 }
                 else {
-                    positioning_ = Positioning::Top_Right;
+                    positioning_ = ComponentPositioning_Top_Right;
                 }
             }
 
-            if (width_ <= 1e-10 || height_ <= 1e-10) {
+            if (width_ <= 1e-5 || height_ <= 1e-5) {
                 width_ = default_dims.x;
                 height_ = default_dims.y;
             }
@@ -80,6 +141,9 @@ void LayoutComponent::checkParameters()
         
         case Type::Carousel:
         {
+            // Takes padding into account--make sure that this matches the
+            // display_size + (2 * padding) from the carousel dimensions
+            // calculation function specified below
             ImVec2 default_dims{280, 170};
 
             // NOTE: The carousel is presented as a bar along an edge of
@@ -93,23 +157,23 @@ void LayoutComponent::checkParameters()
             }
 
             if (spacing_ == Spacing::Horizontal) {
-                if (height_ <= 1e-10) {
+                if (height_ <= 1e-5) {
                     height_ = default_dims.y;
                 }
 
-                if (positioning_ != Positioning::Top &&
-                        positioning_ != Positioning::Bottom) {
-                    positioning_ = Positioning::Bottom;
+                if (positioning_ != ComponentPositioning_Top &&
+                        positioning_ != ComponentPositioning_Bottom) {
+                    positioning_ = ComponentPositioning_Bottom;
                 }
             }
             else {
-                if (width_ <= 1e-10) {
+                if (width_ <= 1e-5) {
                     width_ = default_dims.x;
                 }
 
-                if (positioning_ != Positioning::Left &&
-                        positioning_ != Positioning::Right) {
-                    positioning_ = Positioning::Right;
+                if (positioning_ != ComponentPositioning_Left &&
+                        positioning_ != ComponentPositioning_Right) {
+                    positioning_ = ComponentPositioning_Right;
                 }
             }
         }   break;
@@ -120,7 +184,7 @@ void LayoutComponent::checkParameters()
     }
 }
 
-void LayoutComponent::getDisplayPositionAndSize(uint cur_display, uint num_displays, float &x_pos, float &y_pos, 
+void LayoutComponent::getPrimaryDisplayPositionAndSize(uint cur_display, uint num_displays, float &x_pos, float &y_pos, 
         float &width, float &height) const
 {
     const static uint max_vertical_slices(4); // Note: This is half of total possible displays b/c of horizontal slicing
@@ -153,10 +217,6 @@ void LayoutComponent::getDisplayPositionAndSize(uint cur_display, uint num_displ
 
 void LayoutComponent::drawPrimaryWindows() const
 {
-    ImGuiStyle& style(ImGui::GetStyle());
-    float orig_border_size(style.WindowBorderSize);
-    ImVec4 orig_border_color(style.Colors[ImGuiCol_Border]);
-
     uint num_displays(layout_.getPrimaryDisplayCount(false));
 
     for (int i = 0; i < num_displays; ++i) {
@@ -168,7 +228,7 @@ void LayoutComponent::drawPrimaryWindows() const
         win_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus; // Otherwise, it overlays everything
 
         float x_pos, y_pos, win_width, win_height;
-        getDisplayPositionAndSize(i, num_displays, x_pos, y_pos, win_width, win_height);
+        getPrimaryDisplayPositionAndSize(i, num_displays, x_pos, y_pos, win_width, win_height);
         ImGui::SetNextWindowPos(ImVec2(x_pos, y_pos), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(win_width, win_height));
 
@@ -188,11 +248,11 @@ void LayoutComponent::drawPrimaryWindows() const
         }
 
         if (num_displays > 1 && i == layout_.active_window_ix_) {
-            style.WindowBorderSize = 3;
-            style.Colors[ImGuiCol_Border] = layout_.kActiveBorderColor;
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0);
+            ImGui::PushStyleColor(ImGuiCol_Border, layout_.kActiveBorderColor);
         }
 
-        std::string menu_name("Primary Display##" + i);
+        std::string menu_name("Primary Display " + std::to_string(i));
         if (startMenu(menu_name, win_flags)) {
             // Center the image on the window
             ImVec2 image_pos(ImVec2{(ImGui::GetWindowSize().x - img_width) * 0.5f, 
@@ -210,66 +270,167 @@ void LayoutComponent::drawPrimaryWindows() const
         }
 
         if (num_displays > 1 && i == layout_.active_window_ix_) {
-            style.WindowBorderSize = orig_border_size;
-            style.Colors[ImGuiCol_Border] = orig_border_color;
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
         }
+    }
+}
+
+void LayoutComponent::getCarouselRibbonPosAndDisplaysPosAndSize(ImVec2 &ribbon_pos, 
+        std::vector<ImVec4> &display_dim_data) const
+{    
+    ImVec2 display_size{250.0, 140.0};
+
+    ImGuiViewport* main_viewport(ImGui::GetMainViewport());
+    ImVec2 work_pos(main_viewport->GetWorkPos());
+    ribbon_pos = ImVec2(work_pos.x + offset_.x, work_pos.y + offset_.y);
+
+    // Calculate number of displays in carousel
+    const float padding(15.0); // Padding b/w displays as well as edges
+    uint num_displays(0); // Number of displays that can fit w/in ribbon
+    if (spacing_ == Spacing::Horizontal) {
+        num_displays = (width_ - padding) / (display_size.x + padding);
+    }
+    else {
+        num_displays = (height_ - padding) / (display_size.y + padding);
+    }
+
+    if (layout_.secondary_displays_.size() < num_displays) {
+        num_displays = layout_.secondary_displays_.size();
+    }
+
+    // Calculate the display position within the ribbon. In the future, 
+    // this could also calculate a variable size for certain displays
+    float ribbon_middle(width_ / 2.0);
+    for (int i(0); i < num_displays; ++i) {
+        uint spacing_factor(std::ceil(i / 2.0));
+        int side(i % 2 == 0 ? -1 : 1); // -1 = left, 1 = right
+
+        // Calculate spacing b/w displays
+        float disp_spacing(0);
+        if (side == 1) { // Right side
+            disp_spacing = (spacing_factor * padding) + ((spacing_factor-1) * display_size.x);
+        }
+        else if (side == -1 && spacing_factor != 0) {
+            disp_spacing = spacing_factor * (padding + display_size.x);
+        }
+
+        // Calculate position of display
+        ImVec2 display_pos;
+        if (spacing_ == Spacing::Vertical) {
+            // TODO
+        }
+        else {
+            display_pos = ImVec2(ribbon_middle + (side * ((display_size.x / 2) + disp_spacing)), padding);
+        }
+
+        // Add position and size data to display dimensions vector
+        display_dim_data.push_back(ImVec4(display_pos.x, display_pos.y, display_size.x, display_size.y));
     }
 }
 
 void LayoutComponent::drawCarouselRibbon() const
 {
-    ImVec2 display_size{250, 140};
-
-    // Calculate number of displays in carousel and spacing
-    const float display_padding(15.0);
-    const uint max_displays(5);
-    
-    // TODO: Change num display calculation to account for primary thumbnail
-    uint num_displays(0);
-    if (spacing_ == Spacing::Horizontal) {
-        num_displays = (width_ - display_padding) / (display_size.x + display_padding);
-    }
-    else {
-        num_displays = (height_ - display_padding) / (display_size.y + display_padding);
-    }
-
-    if (layout_.secondary_displays_.size()-1 < num_displays) {
-        num_displays = layout_.secondary_displays_.size()-1;
-    }
-    else {
-        num_displays = num_displays > max_displays ? max_displays : num_displays;
-    }
 
     ImGuiWindowFlags win_flags = 0;
     win_flags |= ImGuiWindowFlags_NoDecoration;
     win_flags |= ImGuiWindowFlags_NoInputs;
     win_flags |= ImGuiWindowFlags_NoSavedSettings;
     win_flags |= ImGuiWindowFlags_NoMove;
-    ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-    ImVec2 work_pos(main_viewport->GetWorkPos());
-    ImVec2 ribbon_pos(ImVec2(work_pos.x + offset_.x, work_pos.y + offset_.y));
+
+    std::vector<ImVec4> display_dim_data;
+    ImVec2 ribbon_pos;
+    getCarouselRibbonPosAndDisplaysPosAndSize(ribbon_pos, display_dim_data);
     ImGui::SetNextWindowPos(ribbon_pos);
     ImGui::SetNextWindowSize(ImVec2(width_, height_));
     
+    ImGuiStyle& style(ImGui::GetStyle());
+    float orig_border_size(style.WindowBorderSize);
+    ImVec4 orig_border_color(style.Colors[ImGuiCol_Border]);
     if (startMenu("Carousel", win_flags)) {
-        for (uint i(0), count(0); count < num_displays; ++i) {
+        win_flags |= ImGuiWindowFlags_NoBackground;
+        win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+
+        for (uint i(0); i < display_dim_data.size(); ++i) {
+            ImVec2 display_pos(ribbon_pos.x + display_dim_data[i].x, ribbon_pos.y + display_dim_data[i].y);
+            ImGui::SetNextWindowPos(display_pos);
+
             if (layout_.secondary_displays_.at(i) == layout_.primary_displays_.at(0)) {
-                continue;
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0);
+                ImGui::PushStyleColor(ImGuiCol_Border, layout_.kActiveBorderColor);
+                win_flags ^= ImGuiWindowFlags_NoBackground;
             }
 
-            ImVec2 image_pos(ImVec2{display_padding + (count * (display_size.x + display_padding)), display_padding});
-            ImGui::SetCursorPos(image_pos);
+            std::string title("Carousel Display " + std::to_string(i));
+            if (startMenu(title, win_flags)) {
+                ImGui::SetCursorPos(ImVec2(0.0, 0.0));
 
-            ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_img_ids_.at(i)), ImVec2{display_size.x, display_size.y});
-            
-            // Show camera external name on top of image
-            ImGui::SetCursorPos({image_pos.x + 10, image_pos.y + 5});
-            const std::string &title(layout_.displays_.getDisplayExternalNameById(layout_.secondary_displays_.at(i)));
-            ImGui::Text(title.c_str());
+                ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_img_ids_.at(i)), 
+                    ImVec2{display_dim_data[i].z, display_dim_data[i].w});
+                
+                // Show camera external name on top of image
+                ImGui::SetCursorPos(ImVec2(10, 5));
+                const std::string &title(layout_.displays_.getDisplayExternalNameById(layout_.secondary_displays_.at(i)));
+                ImGui::Text(title.c_str());
 
-            ++count;
+
+                endMenu();
+            }
+
+            if (layout_.secondary_displays_.at(i) == layout_.primary_displays_.at(0)) {
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor();
+                win_flags |= ImGuiWindowFlags_NoBackground;
+            }
         }
 
+        endMenu();
+    }
+}
+
+void LayoutComponent::getPiPWindowPosition(ImVec2 &pos) const
+{
+    ImGuiViewport* main_viewport(ImGui::GetMainViewport());
+    ImVec2 work_pos(main_viewport->GetWorkPos());
+    ImVec2 work_size(main_viewport->GetWorkSize());
+    pos = ImVec2(0.0, 0.0);
+    if (positioning_ & ComponentPositioning_Top) {
+        pos.y = work_pos.y + offset_.y;
+
+        if (positioning_ & ComponentPositioning_Left) {
+            pos.x = work_pos.x + offset_.x;
+        }
+        else if (positioning_ & ComponentPositioning_Right) {
+            pos.x = work_pos.x + (work_size.x - width_ - offset_.x);
+        }
+    }
+    else if (positioning_ & ComponentPositioning_Bottom) {
+        pos.y = work_pos.y + (work_size.y - height_ - offset_.y);
+
+        if (positioning_ & ComponentPositioning_Left) {
+            pos.x = work_pos.x + offset_.x;
+        }
+        else if (positioning_ & ComponentPositioning_Right) {
+            pos.x = work_pos.x + (work_size.x - width_ - offset_.x);
+        }
+    }
+}
+
+void LayoutComponent::drawPiPWindow() const
+{
+    std::string title(layout_.displays_.getDisplayExternalNameById(layout_.secondary_displays_.at(0)));
+    ImGuiWindowFlags win_flags(0);
+    win_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
+    win_flags |= ImGuiWindowFlags_NoTitleBar;
+    win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+
+    ImVec2 window_pos;
+    getPiPWindowPosition(window_pos);
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
+
+    if (startMenu("Picture-in-Picture", win_flags)) {
+        ImGui::Text("%s", title.c_str());
+        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_img_ids_.at(0)), ImVec2(width_, height_));
         endMenu();
     }
 }

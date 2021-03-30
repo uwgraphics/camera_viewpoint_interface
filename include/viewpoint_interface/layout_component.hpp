@@ -3,6 +3,9 @@
 
 #include <string>
 #include <cmath>
+#include <vector>
+
+#include <iostream>
 
 #include <glm/vec2.hpp>
 #include <GLFW/glfw3.h>
@@ -33,24 +36,25 @@ public:
         Floating
     };
 
-    enum class Positioning
+    enum Positioning
     {
-        Auto,
-        Full,
-        Top,
-        Bottom,
-        Left,
-        Right,
-        Top_Left,
-        Top_Right,
-        Bottom_Left,
-        Bottom_Right
+        ComponentPositioning_Auto            = 1 << 5,
+        ComponentPositioning_Full            = 0,
+        ComponentPositioning_Top             = 1 << 0,
+        ComponentPositioning_Bottom          = 1 << 1,
+        ComponentPositioning_Left            = 1 << 2,
+        ComponentPositioning_Right           = 1 << 3,
+        
+        ComponentPositioning_Top_Left        = ComponentPositioning_Top | ComponentPositioning_Left,
+        ComponentPositioning_Top_Right       = ComponentPositioning_Top | ComponentPositioning_Right,
+        ComponentPositioning_Bottom_Left     = ComponentPositioning_Bottom | ComponentPositioning_Left,
+        ComponentPositioning_Bottom_Right    = ComponentPositioning_Bottom | ComponentPositioning_Right
     };
 
 
     LayoutComponent(Layout &layout, Type type, Spacing spacing, Positioning positioning, float width,
             float height, ImVec2 offset) : layout_(layout), type_(type), spacing_(spacing),
-            positioning_(positioning), width_(width), height_(height_), offset_(offset)
+            positioning_(positioning), width_(width), height_(height), offset_(offset)
     {
         checkParameters();
     }
@@ -61,6 +65,7 @@ public:
     inline float getWidth() { return width_; }
     inline float getHeight() { return height_; }
     inline ImVec2 getOffset() { return offset_; }
+    const std::vector<float> getDisplayBounds() const;
 
     void setWidth(float width) { 
         if (width > 0.0) {
@@ -89,10 +94,13 @@ private:
 
     void checkParameters();
 
-    void getDisplayPositionAndSize(uint cur_display, uint num_displays, float &x_pos, float &y_pos, 
+    void getPrimaryDisplayPositionAndSize(uint cur_display, uint num_displays, float &x_pos, float &y_pos,
         float &width, float &height) const;
     void drawPrimaryWindows() const;
+    void getCarouselRibbonPosAndDisplaysPosAndSize(ImVec2 &ribbon_pos, std::vector<ImVec4> &display_dim_data) const;
     void drawCarouselRibbon() const;
+    void getPiPWindowPosition(ImVec2 &window_pos) const;
+    void drawPiPWindow() const;
 };
 
 } // viewpoint_interface
