@@ -29,32 +29,21 @@ public:
         // static uint max_bound = num_displays < parameters.max_displays ? num_displays : parameters.max_displays;
 
         drawDisplaysList(); 
-
         // ImGui::SliderInt("# Displays", (int *) &num_displays, 1, max_bound);
-
         drawDraggableRing();
-
         drawDisplaySelector(0, "Left Display", LayoutDisplayRole::Primary);
         drawDisplaySelector(1, "Right Display", LayoutDisplayRole::Primary);
     }
 
     virtual void draw() override
     {
-        handleImageResponse();
+        addLayoutComponent(LayoutComponent::Type::Primary);
+        drawLayoutComponents();
 
         std::map<std::string, bool> states;
         states["Robot"] = !clutching_;
         states["Suction"] = grabbing_;
         displayStateValues(states);
-
-        displayPrimaryWindows();
-
-        for (int i = 0; i < 2; i++) {
-            std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(i));
-            const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(i)));
-            addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
-                    prim_data, (uint)i, LayoutDisplayRole::Primary});
-        }
     }
 
 private:

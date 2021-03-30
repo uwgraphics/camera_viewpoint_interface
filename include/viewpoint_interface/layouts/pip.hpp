@@ -32,7 +32,7 @@ public:
 
     virtual void displayLayoutParams() override
     {
-        static uint cur_num_displays = parameters_.max_num_displays;
+        static uint cur_num_displays(parameters_.max_num_displays);
 
         drawDisplaysList();
 
@@ -46,10 +46,10 @@ public:
         ImGui::Separator();
 
         ImGui::Text("Picture-in-Picture Settings:\n");
-        uint max_size = 600;
+        uint max_size(600);
         int start_pip_dims[2] = { parameters_.pip_window_dims[0], parameters_.pip_window_dims[1] };
-        bool pip_dims_changed = ImGui::DragInt2("Dimensions", parameters_.pip_window_dims, 1.0f, 100, max_size);
-        bool ar_changed = ImGui::Checkbox("Keep Aspect Ratio", &keep_aspect_ratio_);
+        bool pip_dims_changed(ImGui::DragInt2("Dimensions", parameters_.pip_window_dims, 1.0f, 100, max_size));
+        bool ar_changed(ImGui::Checkbox("Keep Aspect Ratio", &keep_aspect_ratio_));
 
         if (keep_aspect_ratio_) {
             ImGui::Text("Aspect Ratio");
@@ -92,29 +92,19 @@ public:
 
     virtual void draw() override
     {
-        handleImageResponse();
+        addLayoutComponent(LayoutComponent::Type::Primary);
+
+        if (pip_enabled_) {
+            addLayoutComponent(LayoutComponent::Type::Pic_In_Pic, LayoutComponent::Spacing::Floating,
+                LayoutComponent::ComponentPositioning_Top_Right, (float)(parameters_.pip_window_dims[0]),
+                (float)(parameters_.pip_window_dims[1]));
+        }
+        drawLayoutComponents();
 
         std::map<std::string, bool> states;
         states["Robot"] = !clutching_;
         states["Suction"] = grabbing_;
         displayStateValues(states);
-
-        // We only have one primary and one Pic-in-pic display
-        displayPrimaryWindows();
-
-        std::vector<uchar> &prim_data = displays_.getDisplayDataById(primary_displays_.at(0));
-        const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
-        addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
-                prim_data, 0, LayoutDisplayRole::Primary});
-
-        if (pip_enabled_) {
-            displayPiPWindow(parameters_.pip_window_dims[0], parameters_.pip_window_dims[1]);
-
-            std::vector<uchar> &sec_data = displays_.getDisplayDataById(secondary_displays_[0]);
-            const DisplayInfo &sec_info(displays_.getDisplayInfoById(primary_displays_.at(0)));
-            addImageRequestToQueue(DisplayImageRequest{sec_info.dimensions.width, sec_info.dimensions.height, 
-                    sec_data, 0, LayoutDisplayRole::Secondary});
-        }
     }
 
     virtual void handleKeyInput(int key, int action, int mods) override

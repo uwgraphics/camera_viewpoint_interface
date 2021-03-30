@@ -31,20 +31,12 @@ public:
 
     virtual void draw() override
     {
-        handleImageResponse();
+        addLayoutComponent(LayoutComponent::Type::Primary);
+        drawLayoutComponents();
 
         std::map<std::string, bool> states;
         states["Robot"] = !clutching_;
         displayStateValues(states);
-
-        displayPrimaryWindows();
-
-        for (int i = 0; i < primary_displays_.size(); ++i) {
-            std::vector<uchar> &prim_data(displays_.getDisplayDataById(primary_displays_.at(i)));
-            const DisplayInfo &prim_info(displays_.getDisplayInfoById(primary_displays_.at(i)));
-            addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
-                    prim_data, (uint)i, LayoutDisplayRole::Primary});
-        }
     }
 
 private:
