@@ -222,6 +222,7 @@ protected:
     std::vector<uint> secondary_img_ids_; // Stores OpenGL ID for secondary display images
 
     std::vector<LayoutComponent> layout_components_;
+    std::vector<float> display_bounds_;
 
     struct ColorSet
     {
@@ -269,19 +270,13 @@ protected:
     void toPrevActiveWindow();
     void addImageRequestToQueue(DisplayImageRequest request);
     void addLayoutComponent(LayoutComponent::Type type, LayoutComponent::Spacing spacing=LayoutComponent::Spacing::Auto,
-        LayoutComponent::Positioning positioning=LayoutComponent::Positioning::Auto, float width=0.0, float height=0.0,
-        ImVec2 offset=ImVec2{-1.0, -1.0});
+        LayoutComponent::Positioning positioning=LayoutComponent::ComponentPositioning_Auto, float width=0.0,
+        float height=0.0, ImVec2 offset=ImVec2{-1.0, -1.0});
     void drawLayoutComponents();
-    void displayInstructionsWindow(std::string text) const;
     void displayStateValues(std::map<std::string, bool> states) const;
     void drawDisplaysList();
     void drawDisplaySelector(uint num, std::string title="", LayoutDisplayRole role=LayoutDisplayRole::Primary);
     void drawDraggableRing();
-    void getDisplayPositionAndSize(uint cur_display, uint num_displays, float &x_pos, float &y_pos, 
-        float &width, float &height) const;
-    void displayPrimaryWindows() const;
-    void displayPiPWindow(int width, int height) const;
-    void displayCarouselRibbon() const;
 
 private:
     static const uint kNumLayoutTypes = 8;
