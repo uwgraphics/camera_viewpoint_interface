@@ -132,7 +132,7 @@ void App::initializeROS()
     
     // Init display image callbacks
     for (int i = 0; i < layouts.getNumTotalDisplays(); ++i) {
-        ros::Subscriber disp_sub(n.subscribe<sensor_msgs::Image>(layouts.getDisplayInfo(i).topic, 5, 
+        ros::Subscriber disp_sub(n.subscribe<sensor_msgs::Image>(layouts.getDisplayInfo(i).topic, 1, 
                 boost::bind(&App::cameraImageCallback, this, _1, layouts.getDisplayInfo(i).id)));
         disp_subs.push_back(disp_sub);
     }
@@ -405,7 +405,7 @@ void App::handleDisplayImageQueue()
 
     if (queue.size() > tex_ids.size()) {
         for (uint i = tex_ids.size(); i < queue.size(); ++i) {
-            uint new_id = generateGLTextureId();
+            uint new_id(generateGLTextureId());
             tex_ids.push_back(new_id);
         }
     }
@@ -415,7 +415,7 @@ void App::handleDisplayImageQueue()
         uint cur_id(tex_ids.at(i));
 
         int width, height, x, y;
-        if (request.width == 0.0 || request.height == 0.0) {
+        if (request.width == 0 || request.height == 0) {
             glfwGetFramebufferSize(window, &width, &height);
             transformFramebufferDims(&x, &y, &width, &height);
         }
@@ -496,7 +496,10 @@ void App::publishDisplayBounds()
 {
     std_msgs::Float32MultiArray bounds_msg;
     bounds_msg.data = layouts.getDisplayBounds();
-    display_bounds_pub.publish(bounds_msg);
+
+    if (!bounds_msg.data.empty()) {
+        display_bounds_pub.publish(bounds_msg);
+    }
 }
 
 void App::publishDisplayData()
