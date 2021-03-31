@@ -301,10 +301,9 @@ void LayoutComponent::getCarouselRibbonPosAndDisplaysPosAndSize(ImVec2 &ribbon_p
 
     // Calculate the display position within the ribbon. In the future, 
     // this could also calculate a variable size for certain displays
-    float ribbon_middle(width_ / 2.0);
     for (int i(0); i < num_displays; ++i) {
         uint spacing_factor(std::ceil(i / 2.0));
-        int side(i % 2 == 0 ? -1 : 1); // -1 = left, 1 = right
+        int side(i % 2 == 0 ? -1 : 1); // -1 = left/top, 1 = right/bottom
 
         // Calculate spacing b/w displays
         float disp_spacing(0);
@@ -318,9 +317,11 @@ void LayoutComponent::getCarouselRibbonPosAndDisplaysPosAndSize(ImVec2 &ribbon_p
         // Calculate position of display
         ImVec2 display_pos;
         if (spacing_ == Spacing::Vertical) {
-            // TODO
+            float ribbon_middle(height_ / 2.0);
+            display_pos = ImVec2(padding, ribbon_middle + (side * ((display_size.y / 2) + disp_spacing)));
         }
         else {
+            float ribbon_middle(width_ / 2.0);
             display_pos = ImVec2(ribbon_middle + (side * ((display_size.x / 2) + disp_spacing)), padding);
         }
 
@@ -331,7 +332,6 @@ void LayoutComponent::getCarouselRibbonPosAndDisplaysPosAndSize(ImVec2 &ribbon_p
 
 void LayoutComponent::drawCarouselRibbon() const
 {
-
     ImGuiWindowFlags win_flags = 0;
     win_flags |= ImGuiWindowFlags_NoDecoration;
     win_flags |= ImGuiWindowFlags_NoInputs;
@@ -372,7 +372,6 @@ void LayoutComponent::drawCarouselRibbon() const
                 ImGui::SetCursorPos(ImVec2(10, 5));
                 const std::string &title(layout_.displays_.getDisplayExternalNameById(layout_.secondary_displays_.at(i)));
                 ImGui::Text(title.c_str());
-
 
                 endMenu();
             }
