@@ -2,7 +2,7 @@
     "cam0": {
         "internal_name": "dynamic",
         "external_name": "Dynamic Camera",
-        "topic": "/cam/dyn_image",
+        "topic": "/cam/dynamic_image",
         "width": 1920,
         "height": 1080,
         "channels": 3
@@ -10,7 +10,7 @@
     "cam1": {
         "internal_name": "static",
         "external_name": "Static Camera",
-        "topic": "/cam/stat_image",
+        "topic": "/cam/static_image1",
         "width": 1920,
         "height": 1080,
         "channels": 3
