@@ -11,6 +11,8 @@
 #include "viewpoint_interface/layouts/grid.hpp"
 #include "viewpoint_interface/layouts/carousel.hpp"
 
+#include "viewpoint_interface/model.hpp"
+
 namespace viewpoint_interface
 {
 
@@ -21,6 +23,7 @@ public:
 
     LayoutManager() : active_layout(new InactiveLayout(displays)), previous_layout(active_layout) {}
 
+    void addModelData(std::vector<Model>* vec) { models_ = vec; }
     void setGrabbingState(bool state) { active_layout->setGrabbingState(state); }
     void setClutchingState(bool state) { active_layout->setClutchingState(state); }
     void handleCollisionMessage(const std::string& message) { active_layout->handleCollisionMessage(message); }
@@ -46,14 +49,18 @@ public:
             win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
             ImGuiViewport* main_viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, 
-                    main_viewport->GetWorkPos().y + 30), ImGuiCond_Once);
+                    main_viewport->GetWorkPos().y + 100), ImGuiCond_Once);
             if (startMenu(cp_title, win_flags)) {
                 buildControlPanel();
                 endMenu();
             }
         }
 
-        active_layout->draw();
+        // active_layout->draw();
+
+        for (auto& object : objects_) {
+            object.draw();
+        }
     }
 
     void handleKeyInput(int key, int action, int mods)
@@ -114,6 +121,9 @@ private:
 
     std::vector<std::shared_ptr<Layout>> layouts_cache;
     std::vector<LayoutType> excluded_layouts;
+
+    std::vector<Model>* models_;
+    std::vector<Object> objects_;
 
     std::shared_ptr<Layout> newLayout(LayoutType type)
     {
@@ -285,6 +295,19 @@ private:
 
         if (!isLayoutActive(LayoutType::INACTIVE)) {
             ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::Spacing();
+
+            if (ImGui::CollapsingHeader("Loadable Models")) {
+                ImGui::Indent();
+                for (auto& model : *models_) {
+                    if (ImGui::Button(model.getName().c_str())) {
+                        objects_.push_back(Object(model));
+                    }
+                }
+                ImGui::Unindent();
+            }
+            ImGui::Spacing();
+
             ImGui::Text("Parameters for %s:", active_layout->getLayoutName().c_str());
         }
         ImGui::Spacing();
