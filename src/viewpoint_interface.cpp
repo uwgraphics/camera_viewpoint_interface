@@ -28,9 +28,6 @@
 #include "viewpoint_interface/helpers.hpp"
 #include "viewpoint_interface/json.hpp"
 #include "viewpoint_interface/viewpoint_interface.hpp"
-#include "viewpoint_interface/shader.hpp"
-#include "viewpoint_interface/mesh.hpp"
-#include "viewpoint_interface/model.hpp"
 #include "viewpoint_interface/object.hpp"
 
 using json = nlohmann::json;
@@ -65,7 +62,7 @@ bool App::parseCameraFile(std::string cam_config_data)
         return false;
     }
 
-    json j = json::parse(cam_config_data);
+    json j(json::parse(cam_config_data));
 
     for (json::iterator it(j.begin()); it != j.end(); ++it) {
         std::string int_name, ext_name, topic_name;
@@ -78,7 +75,7 @@ bool App::parseCameraFile(std::string cam_config_data)
         h = (*it)["height"];
         c = (*it)["channels"];
 
-        layouts.addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
+        layouts_.addDisplay(Display(int_name, ext_name, topic_name, DisplayDims(w, h, c)));
     }
 
     return true;
@@ -87,7 +84,7 @@ bool App::parseCameraFile(std::string cam_config_data)
 bool App::initialize()
 {
     std::string cam_config_data;
-    n.getParam("cam_config_data", cam_config_data);
+    n_.getParam("cam_config_data", cam_config_data);
 
     // This must run first so that display settings are initialized
     if (!parseCameraFile(cam_config_data)) {
@@ -108,17 +105,17 @@ bool App::initialize()
 
 bool App::initializeSocket()
 {
-    if ((sock.socket = socket(AF_INET, SOCK_DGRAM, 0)) == 0) {
+    if ((sock_.socket = socket(AF_INET, SOCK_DGRAM, 0)) == 0) {
         printText("Could not initialize socket.");
         return false;
     }
 
-    memset(&sock.address, 0, sizeof(sock.address));
-    sock.address.sin_family = AF_INET; 
-    sock.address.sin_addr.s_addr = INADDR_ANY;
-    sock.address.sin_port = htons(sock.PORT);
+    memset(&sock_.address, 0, sizeof(sock_.address));
+    sock_.address.sin_family = AF_INET; 
+    sock_.address.sin_addr.s_addr = INADDR_ANY;
+    sock_.address.sin_port = htons(sock_.PORT);
 
-    if (bind(sock.socket, (const sockaddr *)&sock.address, sizeof(sock.address)) < 0) { 
+    if (bind(sock_.socket, (const sockaddr *)&sock_.address, sizeof(sock_.address)) < 0) { 
         printText("Socket binding failed."); 
         return false;
     }
@@ -128,30 +125,30 @@ bool App::initializeSocket()
 
 void App::initializeROS()
 {
-    spinner.start();
+    spinner_.start();
     
     // Init display image callbacks
-    for (int i = 0; i < layouts.getNumTotalDisplays(); ++i) {
-        ros::Subscriber disp_sub(n.subscribe<sensor_msgs::Image>(layouts.getDisplayInfo(i).topic, 1, 
-                boost::bind(&App::cameraImageCallback, this, _1, layouts.getDisplayInfo(i).id)));
-        disp_subs.push_back(disp_sub);
+    for (int i = 0; i < layouts_.getNumTotalDisplays(); ++i) {
+        ros::Subscriber disp_sub(n_.subscribe<sensor_msgs::Image>(layouts_.getDisplayInfo(i).topic, 1, 
+                boost::bind(&App::cameraImageCallback, this, _1, layouts_.getDisplayInfo(i).id)));
+        disp_subs_.push_back(disp_sub);
     }
 
     // Init camera pose matrix callbacks
-    for (int i = 0; i < layouts.getNumTotalDisplays(); ++i) {
-        ros::Subscriber cam_matrix_sub(n.subscribe<std_msgs::Float32MultiArray>(layouts.getDisplayInfo(i).topic + "_matrix", 1, 
-                boost::bind(&App::cameraMatrixCallback, this, _1, layouts.getDisplayInfo(i).id)));
-        cam_matrix_subs.push_back(cam_matrix_sub);
+    for (int i = 0; i < layouts_.getNumTotalDisplays(); ++i) {
+        ros::Subscriber cam_matrix_sub(n_.subscribe<std_msgs::Float32MultiArray>(layouts_.getDisplayInfo(i).topic + "_matrix", 1, 
+                boost::bind(&App::cameraMatrixCallback, this, _1, layouts_.getDisplayInfo(i).id)));
+        cam_matrix_subs_.push_back(cam_matrix_sub);
     }
 
-    grasping_sub = n.subscribe<std_msgs::Bool>("/robot_state/grasping", 10, boost::bind(&App::graspingCallback, this, _1));
-    clutching_sub = n.subscribe<std_msgs::Bool>("/robot_state/clutching", 10, boost::bind(&App::clutchingCallback, this, _1));
-    collision_sub = n.subscribe<std_msgs::String>("/robot_state/collisions", 10, boost::bind(&App::collisionCallback, this, _1));
-    active_display_sub = n.subscribe<std_msgs::UInt8>("/viewpoint_interface/active_display", 10, 
+    grasping_sub_ = n_.subscribe<std_msgs::Bool>("/robot_state/grasping", 3, boost::bind(&App::graspingCallback, this, _1));
+    clutching_sub_ = n_.subscribe<std_msgs::Bool>("/robot_state/clutching", 3, boost::bind(&App::clutchingCallback, this, _1));
+    collision_sub_ = n_.subscribe<std_msgs::String>("/robot_state/collisions", 3, boost::bind(&App::collisionCallback, this, _1));
+    active_display_sub_ = n_.subscribe<std_msgs::UInt8>("/viewpoint_interface/active_display", 3, 
             boost::bind(&App::activeDisplayCallback, this, _1));
 
-    frame_matrix_pub = n.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/frame_matrix", 10);
-    display_bounds_pub = n.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/display_bounds", 10);
+    frame_matrix_pub_ = n_.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/frame_matrix", 3);
+    display_bounds_pub_ = n_.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/display_bounds", 3);
 }
 
 bool App::initializeGlfw()
@@ -166,29 +163,29 @@ bool App::initializeGlfw()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    monitor = glfwGetPrimaryMonitor();
-    if (!monitor) {
+    monitor_ = glfwGetPrimaryMonitor();
+    if (!monitor_) {
         printText("Could not find primary monitor.");
         return false;
     }
 
     uint win_width, win_height;
-    if (app_params.WINDOW_WIDTH == 0 || app_params.WINDOW_HEIGHT == 0) {
-        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    if (app_params_.WINDOW_WIDTH == 0 || app_params_.WINDOW_HEIGHT == 0) {
+        const GLFWvidmode* mode(glfwGetVideoMode(monitor_));
         win_width = mode->width;
         win_height = mode->height;
     }
     else {
-        win_width = app_params.WINDOW_WIDTH;
-        win_height = app_params.WINDOW_HEIGHT;
+        win_width = app_params_.WINDOW_WIDTH;
+        win_height = app_params_.WINDOW_HEIGHT;
     }
 
-    window = glfwCreateWindow(win_width, win_height, "HRI Study", NULL, NULL);
-    if (!window) {
+    window_ = glfwCreateWindow(win_width, win_height, app_params_.WINDOW_TITLE.c_str(), NULL, NULL);
+    if (!window_) {
         printText("Could not create window.");
         return false;
     }
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(window_);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         printText("Failed to initialize GLAD");
@@ -199,15 +196,15 @@ bool App::initializeGlfw()
     stbi_set_flip_vertically_on_load(true);
 
     int frame_width, frame_height, x, y;
-    glfwGetFramebufferSize(window, &frame_width, &frame_height);
+    glfwGetFramebufferSize(window_, &frame_width, &frame_height);
     transformFramebufferDims(&x, &y, &frame_width, &frame_height);
     glViewport(0, 0, frame_width, frame_height);
     glEnable(GL_DEPTH_TEST);
-    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
-    glfwSetWindowSizeLimits(window, 800, 600, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    glfwSetFramebufferSizeCallback(window_, framebufferSizeCallback);
+    glfwSetWindowSizeLimits(window_, 800, 600, GLFW_DONT_CARE, GLFW_DONT_CARE);
     
-    glfwSetWindowUserPointer(window, this);
-    glfwSetKeyCallback(window, keyCallbackForwarding);
+    glfwSetWindowUserPointer(window_, this);
+    glfwSetKeyCallback(window_, keyCallbackForwarding);
 
     return true;
 }
@@ -216,7 +213,7 @@ void App::initializeImGui()
 {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    io = ImGui::GetIO(); (void)io;
+    io_ = ImGui::GetIO(); (void)io_;
     ImGui::StyleColorsDark();
 
     ImGuiStyle& style = ImGui::GetStyle();
@@ -224,10 +221,10 @@ void App::initializeImGui()
     style.WindowRounding = 6.0;
 
     // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplGlfw_InitForOpenGL(window_, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 
-    if (!io.Fonts->AddFontFromFileTTF("resources/fonts/Ubuntu-Regular.ttf", 18.0f)) {
+    if (!io_.Fonts->AddFontFromFileTTF("resources/fonts/Ubuntu-Regular.ttf", 18.0f)) {
         printText("Could not load font.");
     }
 }
@@ -238,13 +235,37 @@ void App::shutdownApp()
     if (ros::ok()) {
         ros::shutdown();
     }
-    spinner.stop();
+    spinner_.stop();
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-    glfwDestroyWindow(window);
+    glfwDestroyWindow(window_);
     glfwTerminate();
+}
+
+
+void App::loadMeshes()
+{
+    std::string settings_data;
+    n_.getParam("settings_data", settings_data);
+
+    if (settings_data.empty()) {
+        printText("No settings data.");
+    }
+
+    json j(json::parse(settings_data));
+    std::string model_dir("resources/models/");
+    std::string shader_dir("resources/shaders/");
+
+    for (auto model_data : j["models_to_load"]) {
+        std::string model_path(model_dir + std::string(model_data["model"]));
+        std::string fragment_path(shader_dir + std::string(model_data["fragment_shader"]));
+        std::string vertex_path(shader_dir + std::string(model_data["vertex_shader"]));
+        models_.push_back(Model(model_path, fragment_path, vertex_path));
+    }
+
+    layouts_.addModelData(&models_);
 }
 
 
@@ -260,18 +281,18 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
 
             case GLFW_KEY_C:
             {
-                layouts.toggleControlPanel();
+                layouts_.toggleControlPanel();
             } break;
 
             default:
             {
-                layouts.handleKeyInput(key, action, mods);
+                layouts_.handleKeyInput(key, action, mods);
             } break;
         }
     }
     else
     {
-        layouts.handleKeyInput(key, action, mods);
+        layouts_.handleKeyInput(key, action, mods);
     }
 }
 
@@ -315,17 +336,17 @@ void App::parseControllerInput(std::string data)
         {
             case AppCommand::CLOSE_WINDOW:
             {
-                glfwSetWindowShouldClose(window, true);                
+                glfwSetWindowShouldClose(window_, true);                
             }   break;
 
             case AppCommand::TOGGLE_CONTROL_PANEL:
             {
-                layouts.toggleControlPanel();
+                layouts_.toggleControlPanel();
             }   break;
         
             default:
             {
-                layouts.handleControllerInput(it.key());
+                layouts_.handleControllerInput(it.key());
             }   break;
         }
     }
@@ -334,18 +355,18 @@ void App::parseControllerInput(std::string data)
 void App::handleControllerInput()
 {
     pollfd poll_fds;
-    poll_fds.fd = sock.socket;
+    poll_fds.fd = sock_.socket;
     poll_fds.events = POLLIN; // Wait until there's data to read
 
-    while (ros::ok() && !glfwWindowShouldClose(window))
+    while (!exiting_)
     {
-        if (poll(&poll_fds, 1, 1000.0/(float)app_params.loop_rate) > 0) {
-            std::string input_data = getSocketData(sock);
+        if (poll(&poll_fds, 1, 1000.0/(float)app_params_.loop_rate) > 0) {
+            std::string input_data = getSocketData(sock_);
             parseControllerInput(input_data);
         }
     }
 
-    shutdown(sock.socket, SHUT_RDWR);  
+    shutdown(sock_.socket, SHUT_RDWR);  
 }
 
 
@@ -397,9 +418,9 @@ void App::handleDisplayImageQueue()
 {
     static std::vector<uint> tex_ids;
 
-    std::vector<DisplayImageRequest> &queue(layouts.getImageRequestQueue());
+    std::vector<DisplayImageRequest> &queue(layouts_.getImageRequestQueue());
 
-    if (layouts.wasLayoutChanged()) {
+    if (layouts_.wasLayoutChanged()) {
         return;
     }
 
@@ -416,7 +437,7 @@ void App::handleDisplayImageQueue()
 
         int width, height, x, y;
         if (request.width == 0 || request.height == 0) {
-            glfwGetFramebufferSize(window, &width, &height);
+            glfwGetFramebufferSize(window_, &width, &height);
             transformFramebufferDims(&x, &y, &width, &height);
         }
         else {
@@ -429,8 +450,7 @@ void App::handleDisplayImageQueue()
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE,
                 (GLvoid*)request.data.data());
 
-
-        layouts.pushImageResponse(DisplayImageResponse{cur_id, request.index, request.role});
+        layouts_.pushImageResponse(DisplayImageResponse{cur_id, request.index, request.role});
     }
 
     queue.clear();
@@ -455,32 +475,32 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id)
     cv::Mat unflipped_mat;
     cv::flip(cur_img->image, unflipped_mat, 0);
 
-    layouts.forwardImageForDisplayId(id, unflipped_mat);
+    layouts_.forwardImageForDisplayId(id, unflipped_mat);
 }
 
 void App::cameraMatrixCallback(const std_msgs::Float32MultiArrayConstPtr& msg, uint id)
 {
-    return layouts.forwardMatrixForDisplayId(id, msg->data);
+    return layouts_.forwardMatrixForDisplayId(id, msg->data);
 }
 
 void App::graspingCallback(const std_msgs::BoolConstPtr& msg)
 {
-    layouts.setGrabbingState(msg->data);
+    layouts_.setGrabbingState(msg->data);
 }
 
 void App::clutchingCallback(const std_msgs::BoolConstPtr& msg)
 {
-    layouts.setClutchingState(msg->data);
+    layouts_.setClutchingState(msg->data);
 }
 
 void App::collisionCallback(const std_msgs::StringConstPtr& msg)
 {
-    layouts.handleCollisionMessage(msg->data);
+    layouts_.handleCollisionMessage(msg->data);
 }
 
 void App::activeDisplayCallback(const std_msgs::UInt8ConstPtr& msg)
 {
-    layouts.setActiveWindow(msg->data);
+    layouts_.setActiveWindow(msg->data);
 }
 
 void App::publishControlFrameMatrix()
@@ -488,24 +508,24 @@ void App::publishControlFrameMatrix()
     std_msgs::Float32MultiArray matrix_msg;
 
     // TODO: Consider adding camera label to message
-    matrix_msg.data = layouts.getActiveDisplayMatrix();
-    frame_matrix_pub.publish(matrix_msg);
+    matrix_msg.data = layouts_.getActiveDisplayMatrix();
+    frame_matrix_pub_.publish(matrix_msg);
 }
 
 void App::publishDisplayBounds()
 {
     std_msgs::Float32MultiArray bounds_msg;
-    bounds_msg.data = layouts.getDisplayBounds();
+    bounds_msg.data = layouts_.getDisplayBounds();
 
     if (!bounds_msg.data.empty()) {
-        display_bounds_pub.publish(bounds_msg);
+        display_bounds_pub_.publish(bounds_msg);
     }
 }
 
 void App::publishDisplayData()
 {
-    ros::Rate loop_rate(app_params.loop_rate);
-    while (ros::ok() && !glfwWindowShouldClose(window))
+    ros::Rate loop_rate(app_params_.loop_rate);
+    while (!exiting_)
     {
         publishControlFrameMatrix();
         publishDisplayBounds();
@@ -520,25 +540,12 @@ int App::run(int argc, char *argv[])
         return -1;
     }
 
-    // uint overlay = TextureFromFile("clutch_mode_overlay.png", "resources/textures/");
-    // glActiveTexture(GL_TEXTURE2);
-    // glBindTexture(GL_TEXTURE_2D, overlay);
-    
-    // -- Set up shaders --
-    // std::string base_path("resources/shaders/");
-
-    // Shader bg_shader((base_path + "bg_shader.vert").c_str(), (base_path + "bg_shader.frag").c_str());
-    // bg_shader.use();
-    // bg_shader.setInt("Texture", 1);
-    // bg_shader.setInt("Overlay", 2);
-    // ----
-
-
     std::thread controller_input(&App::handleControllerInput, this);
     std::thread publish_display_data(&App::publishDisplayData, this);
+    std::thread load_meshes(&App::loadMeshes, this);
 
-    ros::Rate loop_rate(app_params.loop_rate);
-    while (ros::ok() && !glfwWindowShouldClose(window))
+    ros::Rate loop_rate(app_params_.loop_rate);
+    while (ros::ok() && !glfwWindowShouldClose(window_))
     {
         glfwPollEvents();
 
@@ -547,31 +554,29 @@ int App::run(int argc, char *argv[])
         ImGui::NewFrame();
 
         // ImGui::ShowDemoWindow();
-
-        layouts.draw();
+        
+        layouts_.draw();
         
         handleDisplayImageQueue();
 
-        // bg_shader.setBool("overlay_on", clutch_mode);
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        ImGui::EndFrame();
+
+        glfwSwapBuffers(window_);
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // glBindVertexArray(img_surface.VAO);
-        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        glfwSwapBuffers(window);
-
-        // ImGui::EndFrame();
 
         loop_rate.sleep();
     }
 
+    exiting_ = true;
+
     controller_input.join();
     publish_display_data.join();
+    load_meshes.join();
     shutdownApp();
 
     return 0;

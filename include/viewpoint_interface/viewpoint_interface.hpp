@@ -14,12 +14,12 @@
 #include <glm/mat4x4.hpp> // glm::mat4
 #include <glm/gtx/string_cast.hpp>
 
-#include "viewpoint_interface/shader.hpp"
+#include "viewpoint_interface/model.hpp"
+#include "viewpoint_interface/object.hpp"
 #include "viewpoint_interface/switch.hpp"
 #include "viewpoint_interface/display.hpp"
 #include "viewpoint_interface/layout.hpp"
 #include "viewpoint_interface/layout_manager.hpp"
-#include "viewpoint_interface/scene_camera.hpp"
 
 
 namespace viewpoint_interface
@@ -38,6 +38,8 @@ namespace viewpoint_interface
     struct AppParams
     {
         uint loop_rate = 60;
+
+        const std::string WINDOW_TITLE = "HRI Study";
 
         // Starting window dimensions - 0 indicates fullscreen
         uint const WINDOW_WIDTH = 0;
@@ -61,7 +63,8 @@ namespace viewpoint_interface
         static constexpr float WIDTH_FAC = 1.0f;
         static constexpr float HEIGHT_FAC = 1.0f;
 
-        App(AppParams params=AppParams()) : n("~"), app_params(params), spinner(ros::AsyncSpinner(0)) {}
+        App(AppParams params=AppParams()) : n_("~"), app_params_(params), spinner_(ros::AsyncSpinner(0)),
+            exiting_(false) {}
 
         int run(int argc, char *argv[]);
 
@@ -69,27 +72,32 @@ namespace viewpoint_interface
 
     private:
         // General items
-        AppParams app_params;
-        Socket sock;
-        LayoutManager layouts;
-        bool clutch_mode;
+        AppParams app_params_;
+        Socket sock_;
+        LayoutManager layouts_;
+        bool clutch_mode_;
+        bool exiting_;
+
+        // Overlays
+        std::vector<Model> models_;
+        std::vector<Object> objects_;
 
         // ROS
-        ros::NodeHandle n;
-        ros::AsyncSpinner spinner;
-        ros::Subscriber grasping_sub;
-        ros::Subscriber clutching_sub;
-        ros::Subscriber collision_sub;
-        ros::Subscriber active_display_sub;
-        ros::Publisher frame_matrix_pub;
-        ros::Publisher display_bounds_pub;
-        std::vector<ros::Subscriber> disp_subs;
-        std::vector<ros::Subscriber> cam_matrix_subs;
+        ros::NodeHandle n_;
+        ros::AsyncSpinner spinner_;
+        ros::Subscriber grasping_sub_;
+        ros::Subscriber clutching_sub_;
+        ros::Subscriber collision_sub_;
+        ros::Subscriber active_display_sub_;
+        ros::Publisher frame_matrix_pub_;
+        ros::Publisher display_bounds_pub_;
+        std::vector<ros::Subscriber> disp_subs_;
+        std::vector<ros::Subscriber> cam_matrix_subs_;
 
         // GUI
-        GLFWwindow* window;
-        GLFWmonitor *monitor;
-        ImGuiIO io;
+        GLFWwindow* window_;
+        GLFWmonitor *monitor_;
+        ImGuiIO io_;
 
         enum AppCommand
         {
@@ -113,6 +121,7 @@ namespace viewpoint_interface
         void parseControllerInput(std::string data);
         void handleControllerInput();
         void publishDisplayData();
+        void loadMeshes();
 
         void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id);
         void cameraMatrixCallback(const std_msgs::Float32MultiArrayConstPtr& msg, uint id);
@@ -127,8 +136,6 @@ namespace viewpoint_interface
     };
 
 } // viewpoint_interface
-
-void printText(std::string text="", int newlines=1, bool flush=false);
 
 void glfwErrorCallback(int code, const char* description);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
