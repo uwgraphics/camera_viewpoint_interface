@@ -15,7 +15,7 @@
  * 		flush - whether to flush text. Generally, only needed when
  * 			printing a large body of text with manual newlines
  */
-void printText(std::string text, int newlines, bool flush)
+void printText(std::string text="", int newlines=1, bool flush=false)
 {
     // TODO: Consider adding param for width of text line
     std::cout << text;
