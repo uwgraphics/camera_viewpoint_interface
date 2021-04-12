@@ -1,10 +1,11 @@
 <?xml version="1.0"?>
 <launch>
-      <arg name="config_file"       default="cam_config.json" />   
-
+      <arg name="cam_config_file"       default="cam_config.json" />   
+      <arg name="settings_file"         default="settings.json" />
 
       <node pkg="viewpoint_interface" type="viewpoint_interface" name="viewpoint_interface" 
          output="screen" cwd="node">
-            <param name="cam_config_data" textfile="$(find viewpoint_interface)/resources/config/$(arg config_file)" />
+            <param name="cam_config_data" textfile="$(find viewpoint_interface)/resources/config/cameras/$(arg cam_config_file)" />
+            <param name="settings_data" textfile="$(find viewpoint_interface)/resources/config/settings/$(arg settings_file)" />
       </node>
 </launch>
