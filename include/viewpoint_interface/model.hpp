@@ -7,9 +7,10 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include "viewpoint_interface/helpers.hpp"
-#include "viewpoint_interface/mesh.hpp"
-#include "viewpoint_interface/shader.hpp"
+#include "helpers.hpp"
+#include "mesh.hpp"
+#include "shader.hpp"
+#include "instance_info.hpp"
 #include "stb_image.h"
 
 
@@ -19,13 +20,22 @@ namespace viewpoint_interface
 class Model
 {
 public:
-    Model(const std::string& model_path, const std::string& frag_path, const std::string& vert_path) : 
-            frag_path_(frag_path), vert_path_(vert_path), valid_(false), initialized_(false) 
+    Model(const std::string& model_path, const std::string& frag_path, const std::string& vert_path,
+            glm::vec2 anchor_pos=glm::vec2(0.0), float anchor_range=0.2, glm::vec3 pos=glm::vec3(0.0), 
+            glm::vec3 angles=glm::vec3(0.0), float scale=1.0) :
+            frag_path_(frag_path), vert_path_(vert_path), anchor_position_(anchor_pos), 
+            anchor_range_(anchor_range), default_position_(pos), default_angles_(angles), 
+            default_scale_(scale), valid_(false), initialized_(false) 
     {
         loadModel(model_path);
     }
 
     std::string getName() const { return name_; }
+    glm::vec3 getDefaultPosition() const { return default_position_; }
+    glm::vec3 getDefaultOrientation() const { return default_angles_; }
+    glm::vec3 getDefaultScale() const { return default_scale_; }
+    const glm::vec2& getAnchorPosition() const { return anchor_position_; }
+    const float& getAnchorRange() const { return anchor_range_; }
 
     void initializeModel()
     {
@@ -37,7 +47,6 @@ public:
 
         shader_ = Shader(vert_path_, frag_path_);
 
-        std::cout << "Loading textures" << std::endl;
         // TODO: Load textures
         for (auto& texture : textures_) {
             std::cout << texture.path << std::endl;
@@ -46,7 +55,7 @@ public:
         initialized_ = true;
     }
 
-    void draw(glm::mat4 model_mat)
+    void draw(glm::mat4 model_mat, InstanceState& state)
     {
         if (!valid_ || !initialized_) {
             return;
@@ -55,6 +64,14 @@ public:
         shader_.use();
         shader_.setMat4("model_mat", model_mat);
 
+        if (state.selection_ == SelectionState::Hovered ||
+                state.selection_ == SelectionState::Selected) {
+            shader_.setBool("highlight", true);
+        }
+        else {
+            shader_.setBool("highlight", false);
+        }
+
         for (auto& mesh : meshes_) {
             mesh.draw(shader_);
         }
@@ -62,6 +79,11 @@ public:
 
 private:
     Shader shader_;
+    glm::vec3 default_position_;
+    glm::vec3 default_angles_;
+    glm::vec3 default_scale_;
+    glm::vec2 anchor_position_;
+    float anchor_range_;
     std::string directory_;
     std::string name_;
     std::string frag_path_;
