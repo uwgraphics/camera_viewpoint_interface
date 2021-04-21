@@ -6,6 +6,7 @@ in vec3 normal;
 in vec2 tex_coord;
 
 uniform vec3 diffuse;
+uniform bool highlight;
 
 void main()
 {
@@ -14,5 +15,10 @@ void main()
     vec3 norm = normalize(normal);
     float diffuse_factor = max(dot(norm, light_dir), 0.0);
 
-    frag_color = vec4(diffuse * diffuse_factor, 1.0);
+    vec3 color = diffuse;
+    if (highlight) {
+        color = color + vec3(0.15, 0.15, 0.15);
+    }
+
+    frag_color = vec4(color * diffuse_factor, 1.0);
 }
