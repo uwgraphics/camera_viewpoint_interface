@@ -14,8 +14,7 @@
 #include <glm/mat4x4.hpp> // glm::mat4
 #include <glm/gtx/string_cast.hpp>
 
-#include "viewpoint_interface/model.hpp"
-#include "viewpoint_interface/object.hpp"
+#include "viewpoint_interface/instance.hpp"
 #include "viewpoint_interface/switch.hpp"
 #include "viewpoint_interface/display.hpp"
 #include "viewpoint_interface/layout.hpp"
@@ -80,7 +79,6 @@ namespace viewpoint_interface
 
         // Overlays
         std::vector<Model> models_;
-        std::vector<Object> objects_;
 
         // ROS
         ros::NodeHandle n_;
@@ -120,6 +118,10 @@ namespace viewpoint_interface
         const AppCommand translateControllerInputToCommand(std::string input) const;
         void parseControllerInput(std::string data);
         void handleControllerInput();
+        glm::vec2 getMousePosition();
+        glm::ivec2 getWindowDimensions();
+        float getAspectRatio();
+        void drawOverlays();
         void publishDisplayData();
         void loadMeshes();
 

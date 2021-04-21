@@ -11,7 +11,7 @@
 #include "viewpoint_interface/layouts/grid.hpp"
 #include "viewpoint_interface/layouts/carousel.hpp"
 
-#include "viewpoint_interface/model.hpp"
+#include "viewpoint_interface/instance.hpp"
 
 namespace viewpoint_interface
 {
@@ -36,7 +36,7 @@ public:
         control_panel_active = !control_panel_active;
     }
 
-    void draw()
+    void draw(float aspect_ratio)
     {
         previous_layout = active_layout;
 
@@ -58,14 +58,79 @@ public:
 
         // active_layout->draw();
 
-        for (auto& object : objects_) {
-            object.draw();
+        for (auto& instance : model_instances_) {
+            instance.draw(aspect_ratio);
         }
     }
 
     void handleKeyInput(int key, int action, int mods)
     {
         active_layout->handleKeyInput(key, action, mods);
+    }
+
+    glm::vec2 getMouseCoordinates(glm::vec2 mouse_pos, glm::ivec2 window_dims)
+    {
+        return glm::vec2((mouse_pos.x - (window_dims.x/2.0)) / (window_dims.x/2.0), 
+            -(mouse_pos.y - (window_dims.y/2.0)) / (window_dims.y/2.0));
+    }
+
+    Instance* getHoveredInstance(glm::vec2 mouse_coords)
+    {
+        for (auto& instance : model_instances_) {
+            if (instance.isWithinSelectionRange(mouse_coords)) {
+                return &instance;
+            }
+        }
+
+        return NULL;
+    }
+
+    void handleMouseInput(glm::vec2 pos, glm::ivec2 window_dims, glm::ivec3 buttons)
+    {
+        static glm::ivec3 prev_buttons(GLFW_RELEASE, GLFW_RELEASE, GLFW_RELEASE);
+        static Instance* prev_hovered_instance(NULL);
+        static bool dragging(false);
+
+        enum MouseButtons
+        {
+            LEFT_BUTTON = 0,
+            MIDDLE_BUTTON = 1,
+            RIGHT_BUTTON = 2
+        };
+
+        glm::vec2 mouse_coords(getMouseCoordinates(pos, window_dims));
+        bool left_click_event(buttons[LEFT_BUTTON] == GLFW_PRESS && prev_buttons[LEFT_BUTTON] == GLFW_RELEASE);
+        bool left_release_event(buttons[LEFT_BUTTON] == GLFW_RELEASE && prev_buttons[LEFT_BUTTON] == GLFW_PRESS);
+
+        // Clear previous hovered (but not selected) instance state
+        if (prev_hovered_instance && prev_hovered_instance->getSelectionState() == SelectionState::Hovered) {
+            prev_hovered_instance->setSelectionState(SelectionState::None);
+        }
+
+        if (left_release_event) { dragging = false; }
+
+        Instance* hovered_instance(getHoveredInstance(mouse_coords));
+        if (dragging) { // We only start dragging when active not null and mouse not released
+            active_instance_->setPositionOnScreen(mouse_coords);
+        }
+        else if (left_click_event) {
+            if (active_instance_) {
+                active_instance_->setSelectionState(SelectionState::None);
+            }
+
+            active_instance_ = hovered_instance;
+            
+            if (active_instance_) {
+                dragging = true;
+                active_instance_->setSelectionState(SelectionState::Selected);
+            }
+        }
+        else if (hovered_instance && hovered_instance != active_instance_) {
+            hovered_instance->setSelectionState(SelectionState::Hovered);
+        }
+
+        prev_buttons = buttons;
+        prev_hovered_instance = hovered_instance;
     }
 
     void handleControllerInput(std::string input)
@@ -123,7 +188,8 @@ private:
     std::vector<LayoutType> excluded_layouts;
 
     std::vector<Model>* models_;
-    std::vector<Object> objects_;
+    std::vector<Instance> model_instances_;
+    Instance* active_instance_ = NULL;
 
     std::shared_ptr<Layout> newLayout(LayoutType type)
     {
@@ -301,7 +367,7 @@ private:
                 ImGui::Indent();
                 for (auto& model : *models_) {
                     if (ImGui::Button(model.getName().c_str())) {
-                        objects_.push_back(Object(model));
+                        model_instances_.push_back(Instance(model));
                     }
                 }
                 ImGui::Unindent();

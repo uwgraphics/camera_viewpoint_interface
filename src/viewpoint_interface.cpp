@@ -28,7 +28,6 @@
 #include "viewpoint_interface/helpers.hpp"
 #include "viewpoint_interface/json.hpp"
 #include "viewpoint_interface/viewpoint_interface.hpp"
-#include "viewpoint_interface/object.hpp"
 
 using json = nlohmann::json;
 using App = viewpoint_interface::App;
@@ -205,6 +204,7 @@ bool App::initializeGlfw()
     
     glfwSetWindowUserPointer(window_, this);
     glfwSetKeyCallback(window_, keyCallbackForwarding);
+    glfwSetInputMode(window_, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
 
     return true;
 }
@@ -262,7 +262,22 @@ void App::loadMeshes()
         std::string model_path(model_dir + std::string(model_data["model"]));
         std::string fragment_path(shader_dir + std::string(model_data["fragment_shader"]));
         std::string vertex_path(shader_dir + std::string(model_data["vertex_shader"]));
-        models_.push_back(Model(model_path, fragment_path, vertex_path));
+        
+        std::vector<float> anchor_vec(model_data["anchor_position"].get<std::vector<float>>());
+        glm::vec2 anchor_pos(anchor_vec[0], anchor_vec[1]);
+
+        float anchor_range(model_data["anchor_range"]);
+
+        std::vector<float> pos_vec(model_data["default_position"].get<std::vector<float>>());
+        glm::vec3 def_pos(pos_vec[0], pos_vec[1], pos_vec[2]);
+
+        std::vector<float> angles_vec(model_data["default_angles_degrees"].get<std::vector<float>>());
+        glm::vec3 def_angles(angles_vec[0], angles_vec[1], angles_vec[2]);
+
+        float def_scale(model_data["default_scale"]);
+
+        models_.push_back(Model(model_path, fragment_path, vertex_path, anchor_pos, anchor_range,
+            def_pos, def_angles, def_scale));
     }
 
     layouts_.addModelData(&models_);
@@ -294,6 +309,40 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
     {
         layouts_.handleKeyInput(key, action, mods);
     }
+}
+
+glm::vec2 App::getMousePosition()
+{
+    double x_pos, y_pos;
+    glfwGetCursorPos(window_, &x_pos, &y_pos);
+
+    return glm::vec2(x_pos, y_pos);
+}
+
+glm::ivec2 App::getWindowDimensions()
+{
+    int window_w, window_h;
+    glfwGetFramebufferSize(window_, &window_w, &window_h);
+
+    return glm::ivec2(window_w, window_h);
+}
+
+float App::getAspectRatio()
+{
+    glm::ivec2 window_dims(getWindowDimensions());
+    return (float)window_dims.x / window_dims.y;
+}
+
+void App::drawOverlays()
+{
+    glm::vec2 mouse_pos(getMousePosition());
+    glm::ivec2 window_dims(getWindowDimensions());
+    glm::ivec3 mouse_buttons(glfwGetMouseButton(window_, GLFW_MOUSE_BUTTON_LEFT),
+                             glfwGetMouseButton(window_, GLFW_MOUSE_BUTTON_MIDDLE),
+                             glfwGetMouseButton(window_, GLFW_MOUSE_BUTTON_RIGHT));
+    layouts_.handleMouseInput(mouse_pos, window_dims, mouse_buttons);
+
+    layouts_.draw(getAspectRatio());
 }
 
 std::string getSocketData(Socket &sock)
@@ -549,14 +598,17 @@ int App::run(int argc, char *argv[])
     {
         glfwPollEvents();
 
+        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
         // ImGui::ShowDemoWindow();
         
-        layouts_.draw();
-        
+        drawOverlays();
+
         handleDisplayImageQueue();
 
         ImGui::Render();
@@ -564,10 +616,6 @@ int App::run(int argc, char *argv[])
         ImGui::EndFrame();
 
         glfwSwapBuffers(window_);
-
-        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 
         loop_rate.sleep();
     }
