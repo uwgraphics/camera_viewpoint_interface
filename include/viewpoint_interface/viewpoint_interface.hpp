@@ -61,7 +61,7 @@ namespace viewpoint_interface
         static constexpr float WIDTH_FAC = 1.0f;
         static constexpr float HEIGHT_FAC = 1.0f;
 
-        App(AppParams params=AppParams()) : n("~"), app_params(params), spinner(ros::AsyncSpinner(0)) {}
+        App(AppParams params=AppParams()) : node_("~"), app_params_(params), spinner_(ros::AsyncSpinner(0)) {}
 
         int run(int argc, char *argv[]);
 
@@ -69,27 +69,27 @@ namespace viewpoint_interface
 
     private:
         // General items
-        AppParams app_params;
-        Socket sock;
-        LayoutManager layouts;
-        bool clutch_mode;
+        AppParams app_params_;
+        Socket socket_;
+        LayoutManager layouts_;
+        bool clutch_mode_;
 
         // ROS
-        ros::NodeHandle n;
-        ros::AsyncSpinner spinner;
-        ros::Subscriber grasping_sub;
-        ros::Subscriber clutching_sub;
-        ros::Subscriber collision_sub;
-        ros::Subscriber active_display_sub;
-        ros::Publisher frame_matrix_pub;
-        ros::Publisher display_bounds_pub;
-        std::vector<ros::Subscriber> disp_subs;
-        std::vector<ros::Subscriber> cam_matrix_subs;
+        ros::NodeHandle node_;
+        ros::AsyncSpinner spinner_;
+        ros::Subscriber grasping_sub_;
+        ros::Subscriber clutching_sub_;
+        ros::Subscriber collision_sub_;
+        ros::Subscriber active_display_sub_;
+        ros::Publisher frame_matrix_pub_;
+        ros::Publisher display_bounds_pub_;
+        std::vector<ros::Subscriber> disp_subs_;
+        std::vector<ros::Subscriber> cam_matrix_subs_;
 
         // GUI
-        GLFWwindow* window;
-        GLFWmonitor *monitor;
-        ImGuiIO io;
+        GLFWwindow* window_;
+        GLFWmonitor *monitor_;
+        ImGuiIO io_;
 
         enum AppCommand
         {
