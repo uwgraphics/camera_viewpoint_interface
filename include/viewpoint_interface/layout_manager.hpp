@@ -19,25 +19,25 @@ class LayoutManager
 public:
     const std::string cp_title = "Layouts Control Panel";
 
-    LayoutManager() : active_layout(new InactiveLayout(displays)), previous_layout(active_layout) {}
+    LayoutManager() : active_layout_(new InactiveLayout(displays_)), previous_layout_(active_layout_) {}
 
-    void setGrabbingState(bool state) { active_layout->setGrabbingState(state); }
-    void setClutchingState(bool state) { active_layout->setClutchingState(state); }
-    void handleCollisionMessage(const std::string& message) { active_layout->handleCollisionMessage(message); }
-    void setActiveWindow(const uint& index) { active_layout->setActiveWindow(index); }
-    const std::vector<float>& getActiveDisplayMatrix() const { return active_layout->getActiveDisplayMatrix(); }
-    const std::vector<float> getDisplayBounds() const { return active_layout->getDisplayBounds(); }
+    void setGrabbingState(bool state) { active_layout_->setGrabbingState(state); }
+    void setClutchingState(bool state) { active_layout_->setClutchingState(state); }
+    void handleCollisionMessage(const std::string& message) { active_layout_->handleCollisionMessage(message); }
+    void setActiveWindow(const uint& index) { active_layout_->setActiveWindow(index); }
+    const std::vector<float>& getActiveDisplayMatrix() const { return active_layout_->getActiveDisplayMatrix(); }
+    const std::vector<float> getDisplayBounds() const { return active_layout_->getDisplayBounds(); }
 
     void toggleControlPanel()
     {
-        control_panel_active = !control_panel_active;
+        control_panel_active_ = !control_panel_active_;
     }
 
     void draw()
     {
-        previous_layout = active_layout;
+        previous_layout_ = active_layout_;
 
-        if (control_panel_active)
+        if (control_panel_active_)
         {
             ImGuiWindowFlags win_flags = 0;
             win_flags |= ImGuiWindowFlags_NoScrollbar;
@@ -53,46 +53,46 @@ public:
             }
         }
 
-        active_layout->draw();
+        active_layout_->draw();
     }
 
     void handleKeyInput(int key, int action, int mods)
     {
-        active_layout->handleKeyInput(key, action, mods);
+        active_layout_->handleKeyInput(key, action, mods);
     }
 
     void handleControllerInput(std::string input)
     {
-        active_layout->handleControllerInput(input);
+        active_layout_->handleControllerInput(input);
     }
 
-    void addDisplay(const Display &disp) { displays.addDisplay(disp); }
+    void addDisplay(const Display &disp) { displays_.addDisplay(disp); }
 
     const DisplayInfo& getDisplayInfo(uint ix) const
     {
-        return displays.getDisplayInfo(ix);
+        return displays_.getDisplayInfo(ix);
     }
 
-    uint getNumTotalDisplays() const { return displays.getNumTotalDisplays(); }
+    uint getNumTotalDisplays() const { return displays_.getNumTotalDisplays(); }
 
     void forwardImageForDisplayId(uint id, const cv::Mat &image)
     {
-        displays.copyImageToDisplay(id, image);
+        displays_.copyImageToDisplay(id, image);
     }
 
     void forwardMatrixForDisplayId(uint id, const std::vector<float> &matrix)
     {
-        displays.copyMatrixToDisplay(id, matrix);
+        displays_.copyMatrixToDisplay(id, matrix);
     }
 
     bool wasLayoutChanged() const
     {
-        return previous_layout->getLayoutType() != active_layout->getLayoutType();
+        return previous_layout_->getLayoutType() != active_layout_->getLayoutType();
     }
 
     std::vector<DisplayImageRequest>& getImageRequestQueue()
     {
-        return active_layout->getImageRequestQueue();
+        return active_layout_->getImageRequestQueue();
     }
 
     void pushImageResponse(const DisplayImageResponse &response)
@@ -102,18 +102,18 @@ public:
             return;
         }
 
-        active_layout->pushImageResponse(response);
+        active_layout_->pushImageResponse(response);
     }
 
 private:
-    std::shared_ptr<Layout> active_layout;
-    std::shared_ptr<Layout> previous_layout;
-    DisplayManager displays;
+    std::shared_ptr<Layout> active_layout_;
+    std::shared_ptr<Layout> previous_layout_;
+    DisplayManager displays_;
 
-    bool control_panel_active = true;
+    bool control_panel_active_ = true;
 
-    std::vector<std::shared_ptr<Layout>> layouts_cache;
-    std::vector<LayoutType> excluded_layouts;
+    std::vector<std::shared_ptr<Layout>> layouts_cache_;
+    std::vector<LayoutType> excluded_layouts_;
 
     std::shared_ptr<Layout> newLayout(LayoutType type)
     {
@@ -121,47 +121,47 @@ private:
         switch(type) {
             case LayoutType::DYNAMIC:
             {
-                layout = std::shared_ptr<Layout>(new DynamicLayout(displays));
+                layout = std::shared_ptr<Layout>(new DynamicLayout(displays_));
             } break;
 
             case LayoutType::WIDE:
             {
-                layout = std::shared_ptr<Layout>(new WideLayout(displays));
+                layout = std::shared_ptr<Layout>(new WideLayout(displays_));
             } break;
 
             case LayoutType::PIP:
             {
-                layout = std::shared_ptr<Layout>(new PiPLayout(displays));
+                layout = std::shared_ptr<Layout>(new PiPLayout(displays_));
             } break;
 
             case LayoutType::TIMED_PIP:
             {
-                layout = std::shared_ptr<Layout>(new TimedPiPLayout(displays));
+                layout = std::shared_ptr<Layout>(new TimedPiPLayout(displays_));
             } break;
 
             case LayoutType::SPLIT:
             {
-                layout = std::shared_ptr<Layout>(new SplitLayout(displays));
+                layout = std::shared_ptr<Layout>(new SplitLayout(displays_));
             } break;
 
             case LayoutType::TWINNED:
             {
-                layout = std::shared_ptr<Layout>(new TwinnedLayout(displays));
+                layout = std::shared_ptr<Layout>(new TwinnedLayout(displays_));
             } break;
 
             case LayoutType::GRID:
             {
-                layout = std::shared_ptr<Layout>(new GridLayout(displays));
+                layout = std::shared_ptr<Layout>(new GridLayout(displays_));
             } break;
 
             case LayoutType::CAROUSEL:
             {
-                layout = std::shared_ptr<Layout>(new CarouselLayout(displays));
+                layout = std::shared_ptr<Layout>(new CarouselLayout(displays_));
             } break;
 
             default: 
             {
-                layout = std::shared_ptr<Layout>(new InactiveLayout(displays));
+                layout = std::shared_ptr<Layout>(new InactiveLayout(displays_));
             } break;
         }
         
@@ -171,28 +171,28 @@ private:
     void activateLayout(LayoutType type)
     {
         // It's already active
-        if (active_layout->getLayoutType() == type) {
+        if (active_layout_->getLayoutType() == type) {
             return;
         }
 
         // We cache previously active layouts so that their params are not reset
         // This also allows us to initialize all the layouts with custom params
         // at the start of the program
-        if (!isInCache(active_layout->getLayoutType())) {
-            layouts_cache.push_back(active_layout);
+        if (!isInCache(active_layout_->getLayoutType())) {
+            layouts_cache_.push_back(active_layout_);
         }
 
         if (isInCache(type)) {
-            active_layout = getLayoutFromCache(type);
+            active_layout_ = getLayoutFromCache(type);
         }
         else {
-            active_layout = newLayout(type);
+            active_layout_ = newLayout(type);
         }
     }
 
     bool isLayoutActive(LayoutType type) const
     {
-        if (active_layout->getLayoutType() == type) {
+        if (active_layout_->getLayoutType() == type) {
             return true;
         }
 
@@ -202,13 +202,13 @@ private:
     void excludeLayout(LayoutType type)
     {
         if (!isLayoutExcluded(type)) {
-            excluded_layouts.push_back(type);
+            excluded_layouts_.push_back(type);
         }
     }
 
     bool isLayoutExcluded(LayoutType type) const
     {
-        const std::vector<LayoutType> &vec = excluded_layouts;
+        const std::vector<LayoutType> &vec = excluded_layouts_;
         if (std::find(vec.begin(), vec.end(), type) != vec.end()) {
             return true;
         }
@@ -218,7 +218,7 @@ private:
 
     bool isInCache(LayoutType type) const
     {
-        for (const std::shared_ptr<Layout> layout : layouts_cache) {
+        for (const std::shared_ptr<Layout> layout : layouts_cache_) {
             if (layout->getLayoutType() == type) {
                 return true;
             }
@@ -231,13 +231,13 @@ private:
     {
         // LayoutManager is initialized with an InactiveLayout, so it should always
         // should be the first layout in the cache
-        std::shared_ptr<Layout> none_layout(layouts_cache[0]);
+        std::shared_ptr<Layout> none_layout(layouts_cache_[0]);
 
         if (type == LayoutType::INACTIVE) {
             return none_layout;
         }
 
-        for (const std::shared_ptr<Layout> layout : layouts_cache) {
+        for (const std::shared_ptr<Layout> layout : layouts_cache_) {
             if (layout->getLayoutType() == type) {
                 return layout;
             }
@@ -250,8 +250,8 @@ private:
     {
         if (ImGui::BeginMenuBar())
         {
-            if (ImGui::BeginMenu(active_layout->getLayoutName().c_str())) {
-                std::vector<std::string> layout_names = active_layout->getLayoutList();
+            if (ImGui::BeginMenu(active_layout_->getLayoutName().c_str())) {
+                std::vector<std::string> layout_names = active_layout_->getLayoutList();
                 bool selected;
                 bool inactivate = false;
 
@@ -285,12 +285,12 @@ private:
 
         if (!isLayoutActive(LayoutType::INACTIVE)) {
             ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::Text("Parameters for %s:", active_layout->getLayoutName().c_str());
+            ImGui::Text("Parameters for %s:", active_layout_->getLayoutName().c_str());
         }
         ImGui::Spacing();
         ImGui::Spacing();
 
-        active_layout->displayLayoutParams();
+        active_layout_->displayLayoutParams();
     }
 
 };
