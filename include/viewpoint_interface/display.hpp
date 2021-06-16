@@ -105,8 +105,6 @@ namespace viewpoint_interface
     public:
         DisplayManager() {}
 
-        uint size() const { return displays.size(); }
-
         void addDisplay(const Display &disp)
         {
             uint ix = displays.size();

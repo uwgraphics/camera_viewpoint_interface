@@ -19,7 +19,7 @@ public:
     {
         addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
 
-        for (int i = 0; i < displays.size(); ++i) {
+        for (int i = 0; i < displays.getNumTotalDisplays(); ++i) {
             addDisplayByIxAndRole(i, LayoutDisplayRole::Secondary);
         }
     }

@@ -18,7 +18,7 @@ public:
     GridLayout(DisplayManager &displays, GridParams params=GridParams()) : Layout(LayoutType::GRID, displays),
             parameters_(params) 
     {
-        for (int i = 0; i < displays_.size(); ++i) {
+        for (int i = 0; i < displays_.getNumTotalDisplays(); ++i) {
             addDisplayByIxAndRole(i, LayoutDisplayRole::Primary);
         }
     }
