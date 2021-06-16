@@ -253,6 +253,28 @@ void Layout::toNextDisplay(uint vec_ix, LayoutDisplayRole role)
     role_vec[vec_ix] = displays_.getDisplayId(next_ix);
 }
 
+void Layout::toNextDisplayIfInRole(uint ix, LayoutDisplayRole role)
+{
+    switch (role)
+    {
+        case LayoutDisplayRole::Primary:
+        {
+            int item_ix(getItemIndexInVector(displays_.getDisplayId(ix), primary_displays_));
+            if (item_ix != -1) {
+                toNextDisplay(item_ix, LayoutDisplayRole::Primary);
+            }
+        }   break;
+
+        case LayoutDisplayRole::Secondary:
+        {
+            int item_ix(getItemIndexInVector(displays_.getDisplayId(ix), secondary_displays_));
+            if (item_ix != -1) {
+                toNextDisplay(item_ix, LayoutDisplayRole::Secondary);
+            }
+        }   break;    
+    }
+}
+
 void Layout::toPrevDisplay(uint vec_ix, LayoutDisplayRole role)
 {
     std::vector<uint> &role_vec(getDisplaysVectorFromRole(role));
@@ -449,32 +471,104 @@ void Layout::displayStateValues(std::map<std::string, bool> states) const
     }
 }
 
-void Layout::drawDisplaysList()
+void Layout::drawDisplaysList(uint display_limit)
 {
-    // TODO: If num is one, just use standard ListBox
+    static std::list<uint> active_ixs_cache;
+    static bool cache_init(false);
+    
+    int total_displays(displays_.getNumTotalDisplays());
+    
+    // Initial population of active display cache
+    if (!cache_init) {
+        for (uint i(0); i < total_displays; ++i) {
+            if (displays_.isDisplayIxActive(i)) {
+                active_ixs_cache.emplace_back(i);
+            }
+        }
+
+        cache_init = true;
+    }
+
+    if (display_limit > 0) { // Pare down to active display number limit
+        // Identify newly-active ixs
+        std::list<uint> newly_active_ixs; // Store ixs of displays activated since last loop
+        std::list<uint> still_active_ixs; // Store ixs that stayed active across loops
+        for (uint i(0); i < total_displays; ++i) {
+            if (displays_.isDisplayIxActive(i)) {
+                if (std::find(active_ixs_cache.begin(), active_ixs_cache.end(), i) == active_ixs_cache.end()) {
+                    newly_active_ixs.emplace_back(i); // Display was activated since last loop
+                }
+                else {
+                    still_active_ixs.emplace_back(i); // Display remained active
+                }
+            }
+        }
+
+        uint num_active_displays(newly_active_ixs.size() + still_active_ixs.size());
+        while (num_active_displays > display_limit && !still_active_ixs.empty()) {
+            // Draw down the more 'stale' displays first to get to the limit
+            uint ix(still_active_ixs.front());
+            displays_.flipDisplayState(ix);
+
+            // Switch to next active display if this one was primary or secondary
+            toNextDisplayIfInRole(ix, LayoutDisplayRole::Primary);
+            toNextDisplayIfInRole(ix, LayoutDisplayRole::Secondary);
+
+            still_active_ixs.pop_front();
+            --num_active_displays;
+        }
+        while (num_active_displays > display_limit) {
+            // Draw down the newly-activated displays
+            // NOTE: This should probably never be necessary since there is probably no more 
+            // than one display activated since the previous loop. There is also no check on
+            // the list size since an empty list would be problematic either way.
+            uint ix(newly_active_ixs.front());
+            displays_.flipDisplayState(ix);
+
+            // Switch to next active display if this one was primary or secondary
+            toNextDisplayIfInRole(ix, LayoutDisplayRole::Primary);
+            toNextDisplayIfInRole(ix, LayoutDisplayRole::Secondary);
+
+            newly_active_ixs.pop_front();
+            --num_active_displays; 
+        }
+
+        // Update active display cache
+        active_ixs_cache.clear();
+        for (uint ix : still_active_ixs) {
+            active_ixs_cache.emplace_back(ix);
+        }
+        for (uint ix : newly_active_ixs) {
+            active_ixs_cache.emplace_back(ix);
+        }
+    }
+    else { // display_limit == 0 indicates no limit on number of active displays
+        // Update active display cache
+        active_ixs_cache.clear();
+        for (uint i(0); i < total_displays; ++i) {
+            if (displays_.isDisplayIxActive(i)) {
+                active_ixs_cache.emplace_back(i);
+            }
+        }
+    }
 
     const int max_items(5); // Max number of displays to list w/o scrolling
-
-    int total_displays(displays_.size());
     int opt_shown(total_displays > max_items ? max_items : total_displays);
     if (ImGui::ListBoxHeader("Available\nDisplays", total_displays, opt_shown)) {
-        for (int i(0); i < total_displays; i++) {
-            bool active = displays_.isDisplayIxActive(i);
+        for (uint i(0); i < total_displays; ++i) {
+            bool active(displays_.isDisplayIxActive(i));
 
             if (ImGui::Selectable(displays_.getDisplayInternalName(i).c_str(), active)) {
-                if (!displays_.isDisplayIxActive(i) || displays_.getNumActiveDisplays() > 1) {
+                if (displays_.isDisplayIxActive(i) && displays_.getNumActiveDisplays() > 1) {
                     displays_.flipDisplayState(i);
 
-                    int item_ix(getItemIndexInVector(displays_.getDisplayId(i), primary_displays_));
-                    if (item_ix != -1) {
-                        toNextDisplay(item_ix, LayoutDisplayRole::Primary);
-                    }
-                    else {
-                        item_ix = getItemIndexInVector(displays_.getDisplayId(i), secondary_displays_);
-                        if (item_ix != -1) {
-                            toNextDisplay(item_ix, LayoutDisplayRole::Secondary);
-                        }
-                    }
+                    // Switch to next active display if this one was primary or secondary,
+                    // unless it's the last active display
+                    toNextDisplayIfInRole(i, LayoutDisplayRole::Primary);
+                    toNextDisplayIfInRole(i, LayoutDisplayRole::Secondary);
+                }
+                else if (!displays_.isDisplayIxActive(i)) {
+                    displays_.flipDisplayState(i);
                 }
             }
         }
@@ -542,7 +636,7 @@ void Layout::drawDraggableRing()
     uint disps_num(displays_.getNumActiveDisplays());
     if (ImGui::ListBoxHeader("Display\nOrder", disps_num)) {
 
-        for (int i(0); i < displays_.size(); i++) {
+        for (int i(0); i < displays_.getNumTotalDisplays(); i++) {
             if (!displays_.isDisplayIxActive(i)) {
                 continue;
             }
@@ -563,7 +657,7 @@ void Layout::drawDraggableRing()
 
             if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {
                 int next = i + (ImGui::GetMouseDragDelta(0).y < 0.f ? -1 : 1);
-                if (next >= 0 && next < displays_.size())
+                if (next >= 0 && next < displays_.getNumTotalDisplays())
                 {
                     displays_.swapDisplays(i, next);
                     ImGui::ResetMouseDragDelta();

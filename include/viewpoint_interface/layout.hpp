@@ -2,6 +2,7 @@
 #define __LAYOUT_HPP__
 
 #include <map>
+#include <list>
 #include <string>
 #include <memory>
 #include <algorithm>
@@ -265,6 +266,7 @@ protected:
     void addPrimaryDisplayById(uint id);
     void addSecondaryDisplayById(uint id);
     void toNextDisplay(uint vec_ix, LayoutDisplayRole role);
+    void toNextDisplayIfInRole(uint vec_ix, LayoutDisplayRole role);
     void toPrevDisplay(uint vec_ix, LayoutDisplayRole role);
     void toNextActiveWindow();
     void toPrevActiveWindow();
@@ -274,7 +276,7 @@ protected:
         float height=0.0, ImVec2 offset=ImVec2{-1.0, -1.0});
     void drawLayoutComponents();
     void displayStateValues(std::map<std::string, bool> states) const;
-    void drawDisplaysList();
+    void drawDisplaysList(uint display_limit=0);
     void drawDisplaySelector(uint num, std::string title="", LayoutDisplayRole role=LayoutDisplayRole::Primary);
     void drawDraggableRing();
 
