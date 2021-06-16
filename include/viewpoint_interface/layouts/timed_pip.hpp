@@ -23,10 +23,6 @@ public:
             parameters_(params), keep_aspect_ratio_(true), pip_enabled_(false), 
             countdown_(5, Timer::DurationType::SECONDS)
     {
-        if (parameters_.max_num_displays > displays.size() || parameters_.max_num_displays == 0) {
-            parameters_.max_num_displays = displays.size();
-        }
-
         addDisplayByIxAndRole(parameters_.start_primary_display, LayoutDisplayRole::Primary);
         addDisplayByIxAndRole(parameters_.start_pip_display, LayoutDisplayRole::Secondary);
     }
@@ -35,9 +31,8 @@ public:
     {
         static uint cur_num_displays(parameters_.max_num_displays);
 
-        drawDisplaysList();
-
-        ImGui::SliderInt("# Displays", (int *) &cur_num_displays, 1, parameters_.max_num_displays);
+        ImGui::SliderInt("# Displays", (int *)&cur_num_displays, 0, parameters_.max_num_displays);
+        drawDisplaysList(cur_num_displays);
 
         drawDraggableRing();
 
