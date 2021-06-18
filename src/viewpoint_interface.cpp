@@ -480,7 +480,7 @@ void App::collisionCallback(const std_msgs::StringConstPtr& msg)
 
 void App::activeDisplayCallback(const std_msgs::UInt8ConstPtr& msg)
 {
-    layouts_.setActiveWindow(msg->data);
+    layouts_.setActiveFrame(msg->data);
 }
 
 void App::publishControlFrameMatrix()
