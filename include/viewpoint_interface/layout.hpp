@@ -13,6 +13,7 @@
 
 #include "layout_component.hpp"
 #include "display.hpp"
+#include "display_ring.hpp"
 #include "timer.hpp"
 #include "scoreboard.hpp"
 
@@ -38,40 +39,6 @@ static void endMenu()
 {
     ImGui::PopItemWidth();
     ImGui::End();
-}
-
-template <typename T>
-int getItemIndexInVector(T item, std::vector<T> &vec)
-{
-    auto iter(std::find(vec.begin(), vec.end(), item));
-    if (iter != vec.end()) {
-        return iter - vec.begin();
-    }
-
-    return -1;
-}
-
-template <typename T>
-int getItemIndexInVector(T item, const std::vector<T> &vec)
-{
-    auto iter(std::find(vec.begin(), vec.end(), item));
-    if (iter != vec.end()) {
-        return iter - vec.begin();
-    }
-
-    return -1;
-}
-
-template <typename T>
-bool isItemInVector(T item, std::vector<T> &vec)
-{
-    return getItemIndexInVector(item, vec) != -1;
-}
-
-template <typename T>
-bool isItemInVector(T item, const std::vector<T> &vec)
-{
-    return getItemIndexInVector(item, vec) != -1;
 }
 
 
@@ -102,8 +69,8 @@ enum LayoutCommand
     SECONDARY_NEXT,
     SECONDARY_PREV,
     TOGGLE,
-    ACTIVE_WINDOW_NEXT,
-    ACTIVE_WINDOW_PREV
+    ACTIVE_FRAME_NEXT,
+    ACTIVE_FRAME_PREV
 };
 
 enum class LayoutDisplayRole
@@ -153,7 +120,7 @@ public:
 
     void setGrabbingState(bool state) { grabbing_ = state; }
     void setClutchingState(bool state) { clutching_ = state; }
-    void setActiveWindow(uint index);
+    void setActiveFrame(uint index);
     const std::vector<float>& getActiveDisplayMatrix() const;
     const std::vector<float> getDisplayBounds() const;
     std::vector<DisplayImageRequest>& getImageRequestQueue();
@@ -195,10 +162,10 @@ public:
             return LayoutCommand::TOGGLE;
         }
         else if (input == "active_next") {
-            return LayoutCommand::ACTIVE_WINDOW_NEXT;
+            return LayoutCommand::ACTIVE_FRAME_NEXT;
         }
         else if (input == "active_prev") {
-            return LayoutCommand::ACTIVE_WINDOW_PREV;
+            return LayoutCommand::ACTIVE_FRAME_PREV;
         }
 
         return LayoutCommand::INVALID_COMMAND;
@@ -209,7 +176,6 @@ public:
 
 protected:
     DisplayManager &displays_;
-    uint active_window_ix_;
     std::vector<DisplayImageRequest> display_image_queue_;
     std::vector<DisplayImageResponse> image_response_queue_;
     Scoreboard scoreboard_;
@@ -217,8 +183,8 @@ protected:
     // States
     bool grabbing_, clutching_;
 
-    std::vector<uint> primary_displays_; // Stores display ID
-    std::vector<uint> secondary_displays_; // Stores display ID
+    DisplayRing primary_ring_;
+    DisplayRing secondary_ring_;
     std::vector<uint> primary_img_ids_; // Stores OpenGL ID for primary display images
     std::vector<uint> secondary_img_ids_; // Stores OpenGL ID for secondary display images
 
@@ -240,8 +206,7 @@ protected:
 
     std::vector<float> kDummyMatrix;
 
-    Layout(LayoutType type, DisplayManager &disp) : layout_type_(type), displays_(disp),
-            active_window_ix_(0), kDummyMatrix(12, 0.0)
+    Layout(LayoutType type, DisplayManager &disp) : layout_type_(type), displays_(disp), kDummyMatrix(12, 0.0)
     {
         primary_color_.base =    ImVec4{10.0/255, 190.0/255, 10.0/255, 150.0/255};
         primary_color_.hovered = ImVec4{10.0/255, 190.0/255, 10.0/255, 200.0/255}; 
@@ -261,15 +226,13 @@ protected:
 
     void enableDisplayStyle(LayoutDisplayRole role);
     void disableDisplayStyle();
-    uint getPrimaryDisplayCount(bool include_inactive=false) const;
     void addDisplayByIxAndRole(uint ix, LayoutDisplayRole role);
     void addPrimaryDisplayById(uint id);
     void addSecondaryDisplayById(uint id);
-    void toNextDisplay(uint vec_ix, LayoutDisplayRole role);
-    void toNextDisplayIfInRole(uint vec_ix, LayoutDisplayRole role);
-    void toPrevDisplay(uint vec_ix, LayoutDisplayRole role);
-    void toNextActiveWindow();
-    void toPrevActiveWindow();
+    void activateDisplayAtIx(uint ix);
+    void deactivateDisplayAtIx(uint ix);
+    void toNextDisplay(LayoutDisplayRole role);
+    void toPrevDisplay(LayoutDisplayRole role);
     void addImageRequestToQueue(DisplayImageRequest request);
     void addLayoutComponent(LayoutComponent::Type type, LayoutComponent::Spacing spacing=LayoutComponent::Spacing::Auto,
         LayoutComponent::Positioning positioning=LayoutComponent::ComponentPositioning_Auto, float width=0.0,
@@ -289,7 +252,7 @@ private:
 
     LayoutType layout_type_;
 
-    std::vector<uint> &getDisplaysVectorFromRole(LayoutDisplayRole role);
+    DisplayRing& getDisplaysVectorFromRole(LayoutDisplayRole role);
 
     friend class LayoutComponent;
 };
