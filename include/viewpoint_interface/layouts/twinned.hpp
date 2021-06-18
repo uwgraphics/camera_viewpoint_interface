@@ -40,7 +40,7 @@ public:
     }
 
     void nextDisplayAndFrame() {
-        toNextDisplay(0, LayoutDisplayRole::Primary);
+        toNextDisplay(LayoutDisplayRole::Primary);
     }
 
     virtual void handleKeyInput(int key, int action, int mods) override

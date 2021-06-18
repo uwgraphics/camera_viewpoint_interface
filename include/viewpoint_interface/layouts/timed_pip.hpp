@@ -128,22 +128,22 @@ public:
 
                 case GLFW_KEY_RIGHT:
                 {
-                    toNextDisplay(0, LayoutDisplayRole::Primary);
+                    toNextDisplay(LayoutDisplayRole::Primary);
                 } break;
 
                 case GLFW_KEY_LEFT:
                 {
-                    toPrevDisplay(0, LayoutDisplayRole::Primary);
+                    toPrevDisplay(LayoutDisplayRole::Primary);
                 } break;
 
                 case GLFW_KEY_UP:
                 {
-                    toPrevDisplay(0, LayoutDisplayRole::Secondary);
+                    toPrevDisplay(LayoutDisplayRole::Secondary);
                 } break;
 
                 case GLFW_KEY_DOWN:
                 {
-                    toNextDisplay(0, LayoutDisplayRole::Secondary);
+                    toNextDisplay(LayoutDisplayRole::Secondary);
                 } break;
 
                 default:
