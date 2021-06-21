@@ -9,6 +9,7 @@ namespace viewpoint_interface
 struct TwinnedParams
 {
     uint primary_display = 0;
+    uint max_num_displays = 2;
 };
 
 class TwinnedLayout : public Layout
@@ -22,8 +23,7 @@ public:
 
     virtual void displayLayoutParams() override
     {
-        // TODO: This should limit to only two displays available
-        drawDisplaysList();
+        drawDisplaysList(parameters_.max_num_displays);
         drawDraggableRing();
         drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
     }
