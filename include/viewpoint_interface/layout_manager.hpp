@@ -10,6 +10,7 @@
 #include "viewpoint_interface/layouts/twinned.hpp"
 #include "viewpoint_interface/layouts/grid.hpp"
 #include "viewpoint_interface/layouts/carousel.hpp"
+#include "viewpoint_interface/layouts/twinned_pip.hpp"
 
 namespace viewpoint_interface
 {
@@ -157,6 +158,11 @@ private:
             case LayoutType::CAROUSEL:
             {
                 layout = std::shared_ptr<Layout>(new CarouselLayout(displays_));
+            } break;
+
+            case LayoutType::TWINNED_PIP:
+            {
+                layout = std::shared_ptr<Layout>(new TwinnedPipLayout(displays_));
             } break;
 
             default: 

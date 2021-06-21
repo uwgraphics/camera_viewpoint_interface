@@ -58,7 +58,8 @@ enum LayoutType
     SPLIT,
     TWINNED,
     GRID,
-    CAROUSEL
+    CAROUSEL,
+    TWINNED_PIP
 };
 
 enum LayoutCommand
@@ -244,10 +245,10 @@ protected:
     void drawDraggableRing();
 
 private:
-    static const uint kNumLayoutTypes = 8;
+    static const uint kNumLayoutTypes = 9;
     const std::vector<std::string> kLayoutNames = {
         "Dynamic Camera", "Wide Angle", "Picture-in-Picture", "Timed Pic-in-Pic", "Split Screen",
-        "Twinned", "Grid", "Carousel"
+        "Twinned", "Grid", "Carousel", "Twinned Pic-in-Pic"
     };
 
     LayoutType layout_type_;
