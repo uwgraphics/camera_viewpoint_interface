@@ -264,6 +264,38 @@ void Layout::toNextDisplay(LayoutDisplayRole role)
     role_vec.switchActiveDisplay(displays_.getDisplayId(next_ix));
 }
 
+void Layout::toNextDisplayWithPush(LayoutDisplayRole role)
+{
+    DisplayRing &role_vec(getDisplaysVectorFromRole(role));
+
+    if (role_vec.size() == 0) {
+        return;
+    }
+
+    for (int i(0); i < role_vec.size(); ++i) {
+        uint cur_ix(displays_.getDisplayIxById(role_vec.getDisplayIdAt(i)));
+        uint next_ix(displays_.getNextActiveDisplayIx(cur_ix));
+
+        role_vec.switchDisplayAtIx(i, displays_.getDisplayId(next_ix));
+    }
+}
+
+void Layout::toPrevDisplayWithPush(LayoutDisplayRole role)
+{
+    DisplayRing &role_vec(getDisplaysVectorFromRole(role));
+
+    if (role_vec.size() == 0) {
+        return;
+    }
+
+    for (int i(0); i < role_vec.size(); ++i) {
+        uint cur_ix(displays_.getDisplayIxById(role_vec.getDisplayIdAt(i)));
+        uint prev_ix(displays_.getPrevActiveDisplayIx(cur_ix));
+
+        role_vec.switchDisplayAtIx(i, displays_.getDisplayId(prev_ix));
+    }
+}
+
 void Layout::toPrevDisplay(LayoutDisplayRole role)
 {
     DisplayRing &role_vec(getDisplaysVectorFromRole(role));

@@ -20,10 +20,18 @@ class Layout;
 class LayoutComponent
 {
 public:
+    // To add new layout components follow the following steps:
+    // - Add a new entry to LayoutComponent::Type (immediately below this)
+    // - Add drawing function signature to this file
+    // - Implement drawing function in layout_component.cpp
+    // - Add an entry to call the new component draw function to the main LayoutComponent::draw()
+    // function
+
     enum class Type
     {
         Primary,
         Pic_In_Pic,
+        Double_PiP,
         Carousel
     };
 
@@ -101,6 +109,8 @@ private:
     void drawCarouselRibbon() const;
     void getPiPWindowPosition(ImVec2 &window_pos) const;
     void drawPiPWindow() const;
+    void getDoublePiPWindowPositions(ImVec4 &window_pos) const;
+    void drawDoublePiPWindows() const;
 };
 
 } // viewpoint_interface

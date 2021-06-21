@@ -11,6 +11,7 @@
 #include "viewpoint_interface/layouts/grid.hpp"
 #include "viewpoint_interface/layouts/carousel.hpp"
 #include "viewpoint_interface/layouts/twinned_pip.hpp"
+#include "viewpoint_interface/layouts/double_pip.hpp"
 
 namespace viewpoint_interface
 {
@@ -47,7 +48,7 @@ public:
             win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
             ImGuiViewport* main_viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, 
-                    main_viewport->GetWorkPos().y + 30), ImGuiCond_Once);
+                    main_viewport->GetWorkPos().y + 100), ImGuiCond_Once);
             if (startMenu(cp_title, win_flags)) {
                 buildControlPanel();
                 endMenu();
@@ -163,6 +164,11 @@ private:
             case LayoutType::TWINNED_PIP:
             {
                 layout = std::shared_ptr<Layout>(new TwinnedPipLayout(displays_));
+            } break;
+
+            case LayoutType::DOUBLE_PIP:
+            {
+                layout = std::shared_ptr<Layout>(new DoublePipLayout(displays_));
             } break;
 
             default: 

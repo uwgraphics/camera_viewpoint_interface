@@ -44,7 +44,8 @@ static void endMenu()
 
 // To add/change layouts follow the following steps:
 // - Add/change enum entry in LayoutType for layout
-// - Edit num_layout_types and layout_names in Layout class
+// - Edit num_layout_types and layout_names in Layout class (making sure that
+// the ordering of the layout names matches the order in the LayoutType enum)
 // - Create/change subclass inheriting from Layout class
 // - Implement virtual functions for layout, if necessary
 // - Add/change entry for layout in newLayout() function of LayoutManager
@@ -55,11 +56,12 @@ enum LayoutType
     WIDE,
     PIP,
     TIMED_PIP,
+    TWINNED_PIP,
+    DOUBLE_PIP,
     SPLIT,
     TWINNED,
     GRID,
-    CAROUSEL,
-    TWINNED_PIP
+    CAROUSEL
 };
 
 enum LayoutCommand
@@ -234,6 +236,8 @@ protected:
     void deactivateDisplayAtIx(uint ix);
     void toNextDisplay(LayoutDisplayRole role);
     void toPrevDisplay(LayoutDisplayRole role);
+    void toNextDisplayWithPush(LayoutDisplayRole role);
+    void toPrevDisplayWithPush(LayoutDisplayRole role);
     void addImageRequestToQueue(DisplayImageRequest request);
     void addLayoutComponent(LayoutComponent::Type type, LayoutComponent::Spacing spacing=LayoutComponent::Spacing::Auto,
         LayoutComponent::Positioning positioning=LayoutComponent::ComponentPositioning_Auto, float width=0.0,
@@ -245,10 +249,10 @@ protected:
     void drawDraggableRing();
 
 private:
-    static const uint kNumLayoutTypes = 9;
+    static const uint kNumLayoutTypes = 10;
     const std::vector<std::string> kLayoutNames = {
-        "Dynamic Camera", "Wide Angle", "Picture-in-Picture", "Timed Pic-in-Pic", "Split Screen",
-        "Twinned", "Grid", "Carousel", "Twinned Pic-in-Pic"
+        "Dynamic Camera", "Wide Angle", "Picture-in-Picture", "Timed Pic-in-Pic", "Twinned Pic-in-Pic",
+        "Double Pic-in-Pic", "Split Screen", "Twinned", "Grid", "Carousel"
     };
 
     LayoutType layout_type_;

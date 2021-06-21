@@ -137,6 +137,18 @@ public:
         return ring_[active_frame_];
     }
 
+    uint getNextActiveFrameDisplayId() const
+    {
+        if (ring_.empty()) {
+            return 0;
+        }
+        else if (active_frame_ == size() - 1) {
+            return ring_[0];
+        }
+
+        return ring_[active_frame_ + 1];
+    }
+
     void setActiveFrameByIndex(uint ix)
     {
         active_frame_ = ix;
