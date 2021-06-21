@@ -289,7 +289,7 @@ void LayoutComponent::drawPrimaryWindows() const
                                         (ImGui::GetWindowSize().y - img_height) * 0.5f});
             ImGui::SetCursorPos(image_pos);
 
-            ImGui::Image(reinterpret_cast<ImTextureID>(layout_.primary_img_ids_.at(i)), ImVec2 {img_width, img_height});
+            ImGui::Image(reinterpret_cast<ImTextureID>(layout_.primary_ring_.getImageIdForDisplayId(display_id)), ImVec2 {img_width, img_height});
             
             // Show camera external name on top of image
             ImGui::SetCursorPos({image_pos.x + 10, image_pos.y + 5});
@@ -384,8 +384,9 @@ void LayoutComponent::drawCarouselRibbon() const
         for (uint i(0); i < display_dim_data.size(); ++i) {
             ImVec2 display_pos(ribbon_pos.x + display_dim_data[i].x, ribbon_pos.y + display_dim_data[i].y);
             ImGui::SetNextWindowPos(display_pos);
+            uint display_id(layout_.secondary_ring_.getDisplayIdAt(i));
 
-            if (layout_.secondary_ring_.getDisplayIdAt(i) == layout_.primary_ring_.getActiveFrameDisplayId()) {
+            if (display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0);
                 ImGui::PushStyleColor(ImGuiCol_Border, layout_.kActiveBorderColor);
                 win_flags ^= ImGuiWindowFlags_NoBackground;
@@ -395,18 +396,18 @@ void LayoutComponent::drawCarouselRibbon() const
             if (startMenu(title, win_flags)) {
                 ImGui::SetCursorPos(ImVec2(0.0, 0.0));
 
-                ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_img_ids_.at(i)), 
+                ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(display_id)), 
                     ImVec2{display_dim_data[i].z, display_dim_data[i].w});
                 
                 // Show camera external name on top of image
                 ImGui::SetCursorPos(ImVec2(10, 5));
-                const std::string &title(layout_.displays_.getDisplayExternalNameById(layout_.secondary_ring_.getDisplayIdAt(i)));
+                const std::string &title(layout_.displays_.getDisplayExternalNameById(display_id));
                 ImGui::Text(title.c_str());
 
                 endMenu();
             }
 
-            if (layout_.secondary_ring_.getDisplayIdAt(i) == layout_.primary_ring_.getActiveFrameDisplayId()) {
+            if (display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
                 ImGui::PopStyleVar();
                 ImGui::PopStyleColor();
                 win_flags |= ImGuiWindowFlags_NoBackground;
@@ -463,9 +464,11 @@ void LayoutComponent::drawPiPWindow() const
             return;
         }
 
-        std::string title(layout_.displays_.getDisplayExternalNameById(layout_.secondary_ring_.getActiveFrameDisplayId()));
+        uint active_id(layout_.secondary_ring_.getActiveFrameDisplayId());
+        std::string title(layout_.displays_.getDisplayExternalNameById(active_id));
         ImGui::Text("%s", title.c_str());
-        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_img_ids_.at(0)), ImVec2(width_, height_));
+        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(active_id)),
+            ImVec2(width_, height_));
         endMenu();
     }
 }
@@ -511,9 +514,11 @@ void LayoutComponent::drawDoublePiPWindows() const
             return;
         }
 
-        std::string title(layout_.displays_.getDisplayExternalNameById(layout_.secondary_ring_.getActiveFrameDisplayId()));
+        uint active_id(layout_.secondary_ring_.getActiveFrameDisplayId());
+        std::string title(layout_.displays_.getDisplayExternalNameById(active_id));
         ImGui::Text("%s", title.c_str());
-        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_img_ids_.at(0)), ImVec2(width_, height_));
+        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(active_id)),
+            ImVec2(width_, height_));
         endMenu();
     }
 
@@ -522,9 +527,11 @@ void LayoutComponent::drawDoublePiPWindows() const
     ImGui::SetNextWindowPos(ImVec2{windows_pos.z, windows_pos.w}, ImGuiCond_Once);
     if (startMenu("Picture-in-Picture 2", win_flags)) {
         // This will get the active display again if there's only one active
-        std::string title(layout_.displays_.getDisplayExternalNameById(layout_.secondary_ring_.getNextActiveFrameDisplayId()));
+        uint next_id(layout_.secondary_ring_.getNextActiveFrameDisplayId());
+        std::string title(layout_.displays_.getDisplayExternalNameById(next_id));
         ImGui::Text("%s", title.c_str());
-        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_img_ids_.at(0)), ImVec2(width_, height_));
+        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(next_id)),
+            ImVec2(width_, height_));
         endMenu();
     }
 }

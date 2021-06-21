@@ -144,16 +144,16 @@ void Layout::handleImageResponse()
     for (int i(0); i < image_response_queue_.size(); ++i) {
         DisplayImageResponse &response(image_response_queue_.at(i));
 
-        switch (response.role)
+        switch (response.getRole())
         {
             case LayoutDisplayRole::Primary:
             {
-                primary_img_ids_[response.index] = response.id;
+                primary_ring_.addImageResponseForId(response.getDisplayId(), response.getGLId());
             }   break;
 
             case LayoutDisplayRole::Secondary:
             {
-                secondary_img_ids_[response.index] = response.id;
+                secondary_ring_.addImageResponseForId(response.getDisplayId(), response.getGLId());
             }   break;
         }
     }
@@ -214,13 +214,11 @@ void Layout::addDisplayByIxAndRole(uint ix, LayoutDisplayRole role)
 void Layout::addPrimaryDisplayById(uint id)
 {
     primary_ring_.addDisplayId(id);
-    primary_img_ids_.resize(primary_ring_.size());
 }
 
 void Layout::addSecondaryDisplayById(uint id)
 {
     secondary_ring_.addDisplayId(id);
-    secondary_img_ids_.resize(secondary_ring_.size());
 }
 
 void Layout::activateDisplayAtIx(uint ix)
@@ -433,17 +431,19 @@ void Layout::drawLayoutComponents()
 
     // Clean up and prepare for next frame
     for (int i(0); i < primary_ring_.size(); ++i) {
-        std::vector<uchar>& prim_data(displays_.getDisplayDataById(primary_ring_.getDisplayIdAt(i)));
-        const DisplayInfo& prim_info(displays_.getDisplayInfoById(primary_ring_.getDisplayIdAt(i)));
+        uint prim_id(primary_ring_.getDisplayIdAt(i));
+        std::vector<uchar>& prim_data(displays_.getDisplayDataById(prim_id));
+        const DisplayInfo& prim_info(displays_.getDisplayInfoById(prim_id));
         addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
-                prim_data, (uint)i, LayoutDisplayRole::Primary});
+                prim_data, prim_id, LayoutDisplayRole::Primary});
     }
 
     for (int i(0); i < secondary_ring_.size(); ++i) {
-        std::vector<uchar>& sec_data(displays_.getDisplayDataById(secondary_ring_.getDisplayIdAt(i)));
-        const DisplayInfo& sec_info(displays_.getDisplayInfoById(secondary_ring_.getDisplayIdAt(i)));
+        uint sec_id(secondary_ring_.getDisplayIdAt(i));
+        std::vector<uchar>& sec_data(displays_.getDisplayDataById(sec_id));
+        const DisplayInfo& sec_info(displays_.getDisplayInfoById(sec_id));
         addImageRequestToQueue(DisplayImageRequest{sec_info.dimensions.width, sec_info.dimensions.height,
-                sec_data, (uint)i, LayoutDisplayRole::Secondary});
+                sec_data, sec_id, LayoutDisplayRole::Secondary});
     }
 
     layout_components_.clear();

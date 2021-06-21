@@ -415,22 +415,22 @@ void App::handleDisplayImageQueue()
         uint cur_id(tex_ids.at(i));
 
         int width, height, x, y;
-        if (request.width == 0 || request.height == 0) {
+        if (request.getWidth() == 0 || request.getHeight() == 0) {
             glfwGetFramebufferSize(window_, &width, &height);
             transformFramebufferDims(&x, &y, &width, &height);
         }
         else {
-            width = request.width;
-            height = request.height;
+            width = request.getWidth();
+            height = request.getHeight();
         }
 
         glActiveTexture(0);
         glBindTexture(GL_TEXTURE_2D, cur_id);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE,
-                (GLvoid*)request.data.data());
+                (GLvoid*)request.getDataVector().data());
 
 
-        layouts_.pushImageResponse(DisplayImageResponse{cur_id, request.index, request.role});
+        layouts_.pushImageResponse(DisplayImageResponse{cur_id, request.getDisplayId(), request.getRole()});
     }
 
     queue.clear();

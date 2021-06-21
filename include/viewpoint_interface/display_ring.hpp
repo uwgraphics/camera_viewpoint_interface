@@ -172,12 +172,29 @@ public:
         }
     }
 
+    void addImageResponseForId(uint display_id, uint gl_id)
+    {
+        // NOTE: It may be worth doing some more validation to prune id's for displays
+        // that are inactive, but the images will generally update fast enough that
+        // it doesn't matter if an old image hangs around longer than necessary
+        gl_ids_[display_id] = gl_id;
+    }
+
+    uint getImageIdForDisplayId(uint id) const
+    {
+        auto entry(gl_ids_.find(id));
+        if (entry != gl_ids_.end()) {
+            return entry->second;
+        }
+
+        return 0;
+    }
+
 private:
     std::vector<uint> ring_;
     std::vector<uint> inactive_displays_;
     uint active_frame_ = 0; // Active frame points to an index position within ring_
-
-    // TODO: Deal with primary_img_ids_ association
+    std::map<uint, uint> gl_ids_; // Stores OpenGL ID for displays in ring
 
     int getIndexForDisplayId(uint id)
     {

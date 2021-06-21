@@ -85,23 +85,35 @@ enum class LayoutDisplayRole
 
 struct DisplayImageRequest
 {
-    std::vector<uchar> &data;
-    uint width, height;
-    LayoutDisplayRole role;
-    uint index;
+public:
+    DisplayImageRequest(uint w, uint h, std::vector<uchar> &data, uint id, LayoutDisplayRole role) :
+            width_(w), height_(h), data_(data), disp_id_(id), role_(role) {}
 
-    DisplayImageRequest(uint w, uint h, std::vector<uchar> &vec, uint ix, LayoutDisplayRole rl) :
-            width(w), height(h), data(vec), index(ix), role(rl) {}
+    uint getWidth() const { return width_; }
+    uint getHeight() const { return height_; }
+    uint getDisplayId() const { return disp_id_; }
+    LayoutDisplayRole getRole() const { return role_; }
+    std::vector<uchar>& getDataVector() { return data_; }
+
+private:
+    std::vector<uchar> &data_;
+    uint width_, height_, disp_id_;
+    LayoutDisplayRole role_;
 };
 
 struct DisplayImageResponse
 {
-    LayoutDisplayRole role;
-    uint id;
-    uint index;
+public:
+    DisplayImageResponse(uint gl_id, uint id, LayoutDisplayRole role) : gl_id_(gl_id), disp_id_(id),
+            role_(role) {}
 
-    DisplayImageResponse(uint gl_id, uint ix, LayoutDisplayRole rl) : id(gl_id), index(ix),
-            role(rl) {}
+    uint getGLId() const { return gl_id_; }
+    uint getDisplayId() const { return disp_id_; }
+    LayoutDisplayRole getRole() const { return role_; }
+
+private:
+    LayoutDisplayRole role_;
+    uint gl_id_, disp_id_;
 };
 
     
@@ -188,8 +200,6 @@ protected:
 
     DisplayRing primary_ring_;
     DisplayRing secondary_ring_;
-    std::vector<uint> primary_img_ids_; // Stores OpenGL ID for primary display images
-    std::vector<uint> secondary_img_ids_; // Stores OpenGL ID for secondary display images
 
     std::vector<LayoutComponent> layout_components_;
     std::vector<float> display_bounds_;
