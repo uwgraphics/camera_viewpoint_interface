@@ -81,6 +81,7 @@ namespace viewpoint_interface
         ros::Subscriber clutching_sub_;
         ros::Subscriber collision_sub_;
         ros::Subscriber active_display_sub_;
+        ros::Subscriber manual_command_sub_;
         ros::Publisher frame_matrix_pub_;
         ros::Publisher display_bounds_pub_;
         std::vector<ros::Subscriber> disp_subs_;
@@ -110,6 +111,7 @@ namespace viewpoint_interface
         // Input handling
         void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
         const AppCommand translateControllerInputToCommand(std::string input) const;
+        void handleCommandString(std::string command);
         void parseControllerInput(std::string data);
         void handleControllerInput();
         void publishDisplayData();
@@ -120,6 +122,7 @@ namespace viewpoint_interface
         void clutchingCallback(const std_msgs::BoolConstPtr& msg);
         void collisionCallback(const std_msgs::StringConstPtr& msg);
         void activeDisplayCallback(const std_msgs::UInt8ConstPtr& msg);
+        void handleManualCommand(const std_msgs::StringConstPtr& msg);
         void publishControlFrameMatrix();
         void publishDisplayBounds();
         static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);

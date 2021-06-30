@@ -139,7 +139,7 @@ void App::initializeROS()
 
     // Init camera pose matrix callbacks
     for (int i = 0; i < layouts_.getNumTotalDisplays(); ++i) {
-        ros::Subscriber cam_matrix_sub(node_.subscribe<std_msgs::Float32MultiArray>(layouts_.getDisplayInfo(i).topic + "_matrix", 1, 
+        ros::Subscriber cam_matrix_sub(node_.subscribe<std_msgs::Float32MultiArray>(layouts_.getDisplayInfo(i).topic + "_matrix", 1,
                 boost::bind(&App::cameraMatrixCallback, this, _1, layouts_.getDisplayInfo(i).id)));
         cam_matrix_subs_.push_back(cam_matrix_sub);
     }
@@ -149,6 +149,8 @@ void App::initializeROS()
     collision_sub_ = node_.subscribe<std_msgs::String>("/robot_state/collisions", 10, boost::bind(&App::collisionCallback, this, _1));
     active_display_sub_ = node_.subscribe<std_msgs::UInt8>("/viewpoint_interface/active_display", 10, 
             boost::bind(&App::activeDisplayCallback, this, _1));
+    manual_command_sub_ = node_.subscribe<std_msgs::String>("/viewpoint_interface/manual_command", 10,
+            boost::bind(&App::handleManualCommand, this, _1));
 
     frame_matrix_pub_ = node_.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/frame_matrix", 10);
     display_bounds_pub_ = node_.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/display_bounds", 10);
@@ -300,6 +302,29 @@ const App::AppCommand App::translateControllerInputToCommand(std::string input) 
     return AppCommand::NONE;
 }
 
+void App::handleCommandString(std::string in_string)
+{
+    AppCommand command(translateControllerInputToCommand(in_string));
+
+    switch (command)
+    {
+        case AppCommand::CLOSE_WINDOW:
+        {
+            glfwSetWindowShouldClose(window_, true);                
+        }   break;
+
+        case AppCommand::TOGGLE_CONTROL_PANEL:
+        {
+            layouts_.toggleControlPanel();
+        }   break;
+    
+        default:
+        {
+            layouts_.handleControllerInput(in_string);
+        }   break;
+    }
+}
+
 void App::parseControllerInput(std::string data)
 {
     json j = json::parse(data);
@@ -309,25 +334,7 @@ void App::parseControllerInput(std::string data)
     }
 
     for (json::iterator it(j.begin()); it != j.end(); ++it) {
-        AppCommand command(translateControllerInputToCommand(it.key()));
-
-        switch (command)
-        {
-            case AppCommand::CLOSE_WINDOW:
-            {
-                glfwSetWindowShouldClose(window_, true);                
-            }   break;
-
-            case AppCommand::TOGGLE_CONTROL_PANEL:
-            {
-                layouts_.toggleControlPanel();
-            }   break;
-        
-            default:
-            {
-                layouts_.handleControllerInput(it.key());
-            }   break;
-        }
+        handleCommandString(it.key());
     }
 }
 
@@ -346,6 +353,11 @@ void App::handleControllerInput()
     }
 
     shutdown(socket_.socket, SHUT_RDWR);
+}
+
+void App::handleManualCommand(const std_msgs::StringConstPtr& msg)
+{
+    handleCommandString(msg->data);
 }
 
 
