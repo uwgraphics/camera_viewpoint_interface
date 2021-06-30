@@ -144,6 +144,11 @@ public:
 
         switch(command)
         {
+            case LayoutCommand::TOGGLE:
+            {
+                toNextDisplay(LayoutDisplayRole::Primary);
+            }   break;
+
             default:
             {}  break;
         }

@@ -39,10 +39,6 @@ public:
         displayStateValues(states);
     }
 
-    void nextDisplayAndFrame() {
-        toNextDisplay(LayoutDisplayRole::Primary);
-    }
-
     virtual void handleKeyInput(int key, int action, int mods) override
     {
         if (action == GLFW_PRESS) {
@@ -50,7 +46,7 @@ public:
                 case GLFW_KEY_RIGHT:
                 case GLFW_KEY_LEFT:
                 {
-                    nextDisplayAndFrame();
+                    toNextDisplay(LayoutDisplayRole::Primary);
                 } break;
 
                 default:
@@ -68,7 +64,7 @@ public:
         {
             case LayoutCommand::TOGGLE:
             {
-                nextDisplayAndFrame();
+                toNextDisplay(LayoutDisplayRole::Primary);
             }   break;
 
             default:

@@ -161,7 +161,7 @@ public:
         {
             case LayoutCommand::TOGGLE:
             {
-                countdown_.reset();
+                toNextDisplay(LayoutDisplayRole::Primary);
             }   break;
 
             default:
