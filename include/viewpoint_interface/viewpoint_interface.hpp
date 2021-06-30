@@ -110,7 +110,7 @@ namespace viewpoint_interface
 
         // Input handling
         void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-        const AppCommand translateControllerInputToCommand(std::string input) const;
+        const AppCommand translateStringInputToCommand(std::string input) const;
         void handleCommandString(std::string command);
         void parseControllerInput(std::string data);
         void handleControllerInput();

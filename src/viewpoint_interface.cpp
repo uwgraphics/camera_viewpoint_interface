@@ -290,7 +290,7 @@ std::string getSocketData(Socket &sock)
     return data;
 }
 
-const App::AppCommand App::translateControllerInputToCommand(std::string input) const
+const App::AppCommand App::translateStringInputToCommand(std::string input) const
 {
     if (input == "shutdown") {
         return AppCommand::CLOSE_WINDOW;
@@ -304,7 +304,7 @@ const App::AppCommand App::translateControllerInputToCommand(std::string input) 
 
 void App::handleCommandString(std::string in_string)
 {
-    AppCommand command(translateControllerInputToCommand(in_string));
+    AppCommand command(translateStringInputToCommand(in_string));
 
     switch (command)
     {
