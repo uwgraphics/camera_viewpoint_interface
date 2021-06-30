@@ -38,9 +38,9 @@ public:
         displayStateValues(states);
     }
 
-    virtual void handleControllerInput(std::string input) override
+    virtual void handleStringInput(std::string input) override
     {
-        LayoutCommand command(translateControllerInputToCommand(input));
+        LayoutCommand command(translateStringInputToCommand(input));
 
         switch(command)
         {

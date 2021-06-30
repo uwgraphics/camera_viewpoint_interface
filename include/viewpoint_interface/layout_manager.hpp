@@ -63,9 +63,9 @@ public:
         active_layout_->handleKeyInput(key, action, mods);
     }
 
-    void handleControllerInput(std::string input)
+    void handleStringInput(std::string input)
     {
-        active_layout_->handleControllerInput(input);
+        active_layout_->handleStringInput(input);
     }
 
     void addDisplay(const Display &disp) { displays_.addDisplay(disp); }

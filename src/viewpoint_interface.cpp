@@ -320,7 +320,7 @@ void App::handleCommandString(std::string in_string)
     
         default:
         {
-            layouts_.handleControllerInput(in_string);
+            layouts_.handleStringInput(in_string);
         }   break;
     }
 }

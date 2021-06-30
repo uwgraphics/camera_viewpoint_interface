@@ -88,9 +88,36 @@ void Layout::handleKeyInput(int key, int action, int mods)
     }
 }
 
-void Layout::handleControllerInput(std::string input)
+const LayoutCommand Layout::translateStringInputToCommand(std::string input) const
 {
-    LayoutCommand command(translateControllerInputToCommand(input));
+    if (input == "primary_next") {
+        return LayoutCommand::PRIMARY_NEXT;
+    }
+    else if (input == "primary_prev") {
+        return LayoutCommand::PRIMARY_PREV;
+    }
+    else if (input == "pip_next") {
+        return LayoutCommand::SECONDARY_NEXT;
+    }
+    else if (input == "pip_prev") {
+        return LayoutCommand::SECONDARY_PREV;
+    }
+    else if (input == "toggle") {
+        return LayoutCommand::TOGGLE;
+    }
+    else if (input == "active_next") {
+        return LayoutCommand::ACTIVE_FRAME_NEXT;
+    }
+    else if (input == "active_prev") {
+        return LayoutCommand::ACTIVE_FRAME_PREV;
+    }
+
+    return LayoutCommand::INVALID_COMMAND;
+}
+
+void Layout::handleStringInput(std::string input)
+{
+    LayoutCommand command(translateStringInputToCommand(input));
 
     switch(command)
     {

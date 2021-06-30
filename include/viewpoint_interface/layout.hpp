@@ -159,34 +159,8 @@ public:
      * 
      * Returns: command represented by input string. 
      */
-    const LayoutCommand translateControllerInputToCommand(std::string input) const
-    {
-        if (input == "primary_next") {
-            return LayoutCommand::PRIMARY_NEXT;
-        }
-        else if (input == "primary_prev") {
-            return LayoutCommand::PRIMARY_PREV;
-        }
-        else if (input == "pip_next") {
-            return LayoutCommand::SECONDARY_NEXT;
-        }
-        else if (input == "pip_prev") {
-            return LayoutCommand::SECONDARY_PREV;
-        }
-        else if (input == "toggle") {
-            return LayoutCommand::TOGGLE;
-        }
-        else if (input == "active_next") {
-            return LayoutCommand::ACTIVE_FRAME_NEXT;
-        }
-        else if (input == "active_prev") {
-            return LayoutCommand::ACTIVE_FRAME_PREV;
-        }
-
-        return LayoutCommand::INVALID_COMMAND;
-    }
-
-    virtual void handleControllerInput(std::string input);
+    const LayoutCommand translateStringInputToCommand(std::string input) const;
+    virtual void handleStringInput(std::string input);
     virtual void handleCollisionMessage(const std::string &message);
 
 protected:
