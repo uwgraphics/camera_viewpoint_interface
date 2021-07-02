@@ -18,7 +18,7 @@ public:
 
     uint size() const
     {
-        ring_.size();
+        return ring_.size();
     }
 
     uint getDisplayIdAt(uint ix) const
