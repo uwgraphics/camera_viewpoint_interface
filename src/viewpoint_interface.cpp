@@ -12,6 +12,8 @@
 #include <std_msgs/String.h>
 #include <std_msgs/UInt8.h>
 #include <std_msgs/Float32MultiArray.h>
+#include <sensor_msgs/Joy.h>
+#include <geometry_msgs/Point32.h>
 
 // OpenCV
 #include <opencv2/opencv.hpp>
@@ -154,6 +156,10 @@ void App::initializeROS()
 
     frame_matrix_pub_ = node_.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/frame_matrix", 10);
     display_bounds_pub_ = node_.advertise<std_msgs::Float32MultiArray>("/viewpoint_interface/display_bounds", 10);
+    mouse_pos_raw_ = node_.advertise<geometry_msgs::Point32>("/viewpoint_interface/mouse_pos_raw", 10);
+    mouse_pos_normalized_ = node_.advertise<geometry_msgs::Point32>("/viewpoint_interface/mouse_pos_normalized", 10);
+    mouse_buttons_ = node_.advertise<sensor_msgs::Joy>("/viewpoint_interface/mouse_buttons", 10);
+    mouse_scroll_ = node_.advertise<geometry_msgs::Point32>("/viewpoint_interface/mouse_scroll", 10);
 }
 
 bool App::initializeGlfw()
@@ -210,6 +216,9 @@ bool App::initializeGlfw()
     
     glfwSetWindowUserPointer(window_, this);
     glfwSetKeyCallback(window_, keyCallbackForwarding);
+    glfwSetCursorPosCallback(window_, handleMousePosition);
+    glfwSetMouseButtonCallback(window_, handleMouseButtons);
+    glfwSetScrollCallback(window_, handleMouseScroll);
 
     return true;
 }
@@ -275,6 +284,53 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
     {
         layouts_.handleKeyInput(key, action, mods);
     }
+}
+
+glm::ivec2 App::getWindowDimensions(GLFWwindow* window)
+{
+    int window_w, window_h;
+    glfwGetFramebufferSize(window, &window_w, &window_h);
+
+    return glm::ivec2(window_w, window_h);
+}
+
+void App::handleMousePosition(GLFWwindow* window, double x_pos, double y_pos)
+{
+    App *app = (App *)glfwGetWindowUserPointer(window);
+
+    geometry_msgs::Point32 raw_pos;
+    raw_pos.x = x_pos;
+    raw_pos.y = y_pos;
+    app->mouse_pos_raw_.publish(raw_pos);
+
+    glm::ivec2 window_dims(getWindowDimensions(window));
+    geometry_msgs::Point32 normalized_pos;
+    normalized_pos.x = x_pos / window_dims.x;
+    normalized_pos.y = y_pos / window_dims.y;
+    app->mouse_pos_normalized_.publish(normalized_pos);
+}
+
+void App::handleMouseButtons(GLFWwindow* window, int button, int action, int mods)
+{
+    App *app = (App *)glfwGetWindowUserPointer(window);
+
+    // TODO: Figure out if we just need to care about button action or if we should
+    // poll all the buttons
+    sensor_msgs::Joy buttons;
+    buttons.buttons.emplace_back(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS);
+    buttons.buttons.emplace_back(button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS);
+    buttons.buttons.emplace_back(button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS);
+    app->mouse_buttons_.publish(buttons);
+}
+
+void App::handleMouseScroll(GLFWwindow* window, double x_offset, double y_offset)
+{
+    App *app = (App *)glfwGetWindowUserPointer(window);
+
+    geometry_msgs::Point32 scroll;
+    scroll.x = x_offset;
+    scroll.y = y_offset;
+    app->mouse_scroll_.publish(scroll);
 }
 
 std::string getSocketData(Socket &sock)
@@ -532,20 +588,6 @@ int App::run(int argc, char *argv[])
         return -1;
     }
 
-    // uint overlay = TextureFromFile("clutch_mode_overlay.png", "resources/textures/");
-    // glActiveTexture(GL_TEXTURE2);
-    // glBindTexture(GL_TEXTURE_2D, overlay);
-    
-    // -- Set up shaders --
-    // std::string base_path("resources/shaders/");
-
-    // Shader bg_shader((base_path + "bg_shader.vert").c_str(), (base_path + "bg_shader.frag").c_str());
-    // bg_shader.use();
-    // bg_shader.setInt("Texture", 1);
-    // bg_shader.setInt("Overlay", 2);
-    // ----
-
-
     std::thread controller_input(&App::handleControllerInput, this);
     std::thread publish_display_data(&App::publishDisplayData, this);
 
@@ -561,16 +603,11 @@ int App::run(int argc, char *argv[])
         // ImGui::ShowDemoWindow();
 
         layouts_.draw();
-        
-        handleDisplayImageQueue();
 
-        // bg_shader.setBool("overlay_on", clutch_mode);
+        handleDisplayImageQueue();
 
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // glBindVertexArray(img_surface.VAO);
-        // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

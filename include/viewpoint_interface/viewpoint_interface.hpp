@@ -82,10 +82,14 @@ namespace viewpoint_interface
         ros::Subscriber collision_sub_;
         ros::Subscriber active_display_sub_;
         ros::Subscriber manual_command_sub_;
-        ros::Publisher frame_matrix_pub_;
-        ros::Publisher display_bounds_pub_;
         std::vector<ros::Subscriber> disp_subs_;
         std::vector<ros::Subscriber> cam_matrix_subs_;
+        ros::Publisher frame_matrix_pub_;
+        ros::Publisher display_bounds_pub_;
+        ros::Publisher mouse_pos_raw_;
+        ros::Publisher mouse_pos_normalized_;
+        ros::Publisher mouse_buttons_;
+        ros::Publisher mouse_scroll_;
 
         // GUI
         GLFWwindow* window_;
@@ -114,7 +118,10 @@ namespace viewpoint_interface
         void handleCommandString(std::string command);
         void parseControllerInput(std::string data);
         void handleControllerInput();
-        void publishDisplayData();
+        static glm::ivec2 getWindowDimensions(GLFWwindow* window);
+        static void handleMousePosition(GLFWwindow* window, double x_pos, double y_pos);
+        static void handleMouseButtons(GLFWwindow* window, int button, int action, int mods);
+        static void handleMouseScroll(GLFWwindow* window, double x_offset, double y_offset);
 
         void cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id);
         void cameraMatrixCallback(const std_msgs::Float32MultiArrayConstPtr& msg, uint id);
@@ -124,6 +131,7 @@ namespace viewpoint_interface
         void activeDisplayCallback(const std_msgs::UInt8ConstPtr& msg);
         void handleManualCommand(const std_msgs::StringConstPtr& msg);
         void publishControlFrameMatrix();
+        void publishDisplayData();
         void publishDisplayBounds();
         static void keyCallbackForwarding(GLFWwindow* window, int key, int scancode, int action, int mods);
         void handleDisplayImageQueue();
