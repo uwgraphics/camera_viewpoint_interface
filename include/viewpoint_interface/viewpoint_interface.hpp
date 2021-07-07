@@ -100,12 +100,13 @@ namespace viewpoint_interface
         {
             NONE,
             CLOSE_WINDOW,
-            TOGGLE_CONTROL_PANEL
+            TOGGLE_CONTROL_PANEL,
+            TOGGLE_BUTTONS_PANEL
         };
 
         // General program flow
         bool initialize();
-        bool parseCameraFile(std::string cam_config_data);
+        bool parseConfigFile(std::string config_data);
         bool initializeSocket();
         void initializeROS();
         bool initializeGlfw();

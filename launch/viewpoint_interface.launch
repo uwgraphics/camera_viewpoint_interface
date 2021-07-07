@@ -5,6 +5,6 @@
 
       <node pkg="viewpoint_interface" type="viewpoint_interface" name="viewpoint_interface" 
          output="screen" cwd="node">
-            <param name="cam_config_data" textfile="$(find viewpoint_interface)/resources/config/$(arg config_file)" />
+            <param name="config_data" textfile="$(find viewpoint_interface)/resources/config/$(arg config_file)" />
       </node>
 </launch>

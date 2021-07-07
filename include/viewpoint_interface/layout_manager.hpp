@@ -19,8 +19,6 @@ namespace viewpoint_interface
 class LayoutManager
 {
 public:
-    const std::string cp_title = "Layouts Control Panel";
-
     LayoutManager() : active_layout_(new InactiveLayout(displays_)), previous_layout_(active_layout_) {}
 
     void setGrabbingState(bool state) { active_layout_->setGrabbingState(state); }
@@ -35,12 +33,21 @@ public:
         control_panel_active_ = !control_panel_active_;
     }
 
+    void toggleButtonPanel()
+    {
+        button_panel_active_ = !button_panel_active_;
+    }
+
+    void addButtonTopic(ros::Publisher pub)
+    {
+        button_pubs_.emplace_back(pub);
+    }
+
     void draw()
     {
         previous_layout_ = active_layout_;
 
-        if (control_panel_active_)
-        {
+        if (control_panel_active_) {
             ImGuiWindowFlags win_flags = 0;
             win_flags |= ImGuiWindowFlags_NoScrollbar;
             win_flags |= ImGuiWindowFlags_NoResize;
@@ -49,8 +56,26 @@ public:
             ImGuiViewport* main_viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 30, 
                     main_viewport->GetWorkPos().y + 100), ImGuiCond_Once);
-            if (startMenu(cp_title, win_flags)) {
+            if (startMenu(kControlPanelTitle, win_flags)) {
                 buildControlPanel();
+                endMenu();
+            }
+        }
+
+        if (button_pubs_.size() == 0) {
+            button_panel_active_ = false;
+        }
+        if (button_panel_active_) {
+            ImGuiWindowFlags win_flags = 0;
+            win_flags |= ImGuiWindowFlags_NoDecoration;
+            win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+            ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(ImVec2(
+                    main_viewport->GetWorkPos().x + main_viewport->GetWorkSize().x - 500,
+                    main_viewport->GetWorkPos().y + main_viewport->GetWorkSize().y - 350),
+                    ImGuiCond_Once);
+            if (startMenu(kButtonsPanelTitle, win_flags)) {
+                buildButtonPanel();
                 endMenu();
             }
         }
@@ -112,7 +137,13 @@ private:
     std::shared_ptr<Layout> previous_layout_;
     DisplayManager displays_;
 
+    const std::string kControlPanelTitle = "Layouts Control Panel";
+    const std::string kButtonsPanelTitle = "Buttons Panel";
+
     bool control_panel_active_ = true;
+    // Buttons panel data
+    std::vector<ros::Publisher> button_pubs_;
+    bool button_panel_active_ = true;
 
     std::vector<std::shared_ptr<Layout>> layouts_cache_;
     std::vector<LayoutType> excluded_layouts_;
@@ -188,8 +219,6 @@ private:
         }
 
         // We cache previously active layouts so that their params are not reset
-        // This also allows us to initialize all the layouts with custom params
-        // at the start of the program
         if (!isInCache(active_layout_->getLayoutType())) {
             layouts_cache_.push_back(active_layout_);
         }
@@ -241,7 +270,7 @@ private:
 
     std::shared_ptr<Layout> getLayoutFromCache(LayoutType type) const
     {
-        // LayoutManager is initialized with an InactiveLayout, so it should always
+        // LayoutManager is initialized with an InactiveLayout, so it always
         // should be the first layout in the cache
         std::shared_ptr<Layout> none_layout(layouts_cache_[0]);
 
@@ -303,6 +332,20 @@ private:
         ImGui::Spacing();
 
         active_layout_->displayLayoutParams();
+    }
+
+    void buildButtonPanel()
+    {
+        ImGui::Text(kButtonsPanelTitle.c_str());
+        ImGui::Spacing();
+        for (auto pub : button_pubs_) {
+            if (ImGui::Button(pub.getTopic().c_str())) {
+                std_msgs::Bool signal;
+                signal.data = true;
+                pub.publish(signal);
+            }
+            ImGui::Spacing();
+        }
     }
 
 };

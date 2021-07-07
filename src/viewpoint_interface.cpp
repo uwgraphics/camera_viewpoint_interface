@@ -60,16 +60,26 @@ int main(int argc, char *argv[])
 
 
 // App init/shutdown
-bool App::parseCameraFile(std::string cam_config_data)
+bool App::parseConfigFile(std::string config_data)
 {
-    if (cam_config_data.empty()) {
+    if (config_data.empty()) {
         printText("No camera config data.");
         return false;
     }
 
-    json j = json::parse(cam_config_data);
+    json j = json::parse(config_data);
 
     for (json::iterator it(j.begin()); it != j.end(); ++it) {
+        if (it.key() == "buttons") {
+            for (std::string topic : it.value()) {
+                ros::Publisher pub(node_.advertise<std_msgs::Bool>(topic, 10));
+                layouts_.addButtonTopic(pub);
+            }
+
+            continue;
+        }
+
+        // Display handling
         std::string int_name, ext_name, topic_name;
         uint w, h, c;
 
@@ -88,11 +98,11 @@ bool App::parseCameraFile(std::string cam_config_data)
 
 bool App::initialize()
 {
-    std::string cam_config_data;
-    node_.getParam("cam_config_data", cam_config_data);
+    std::string config_data;
+    node_.getParam("config_data", config_data);
 
     // This must run first so that display settings are initialized
-    if (!parseCameraFile(cam_config_data)) {
+    if (!parseConfigFile(config_data)) {
         return false;
     } 
 
@@ -267,17 +277,22 @@ void App::keyCallback(GLFWwindow* window, int key, int scancode, int action, int
             case GLFW_KEY_ESCAPE:
             {
                 glfwSetWindowShouldClose(window, true);
-            } break;
+            }   break;
 
             case GLFW_KEY_C:
             {
                 layouts_.toggleControlPanel();
-            } break;
+            }   break;
+
+            case GLFW_KEY_B:
+            {
+                layouts_.toggleButtonPanel();
+            }   break;
 
             default:
             {
                 layouts_.handleKeyInput(key, action, mods);
-            } break;
+            }   break;
         }
     }
     else
@@ -354,6 +369,9 @@ const App::AppCommand App::translateStringInputToCommand(std::string input) cons
     else if (input == "toggle_control_panel") {
         return AppCommand::TOGGLE_CONTROL_PANEL;
     }
+    else if (input == "toggle_buttons_panel") {
+        return AppCommand::TOGGLE_BUTTONS_PANEL;
+    }
 
     return AppCommand::NONE;
 }
@@ -372,6 +390,11 @@ void App::handleCommandString(std::string in_string)
         case AppCommand::TOGGLE_CONTROL_PANEL:
         {
             layouts_.toggleControlPanel();
+        }   break;
+
+        case AppCommand::TOGGLE_BUTTONS_PANEL:
+        {
+            layouts_.toggleButtonPanel();
         }   break;
     
         default:
