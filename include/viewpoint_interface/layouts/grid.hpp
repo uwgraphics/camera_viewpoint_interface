@@ -39,6 +39,22 @@ public:
         displayStateValues(states);
     }
 
+    virtual void handleStringInput(std::string input) override
+    {
+        LayoutCommand command(translateStringInputToCommand(input));
+
+        switch(command)
+        {
+            case LayoutCommand::TOGGLE:
+            {
+                toNextDisplay(LayoutDisplayRole::Primary);
+            }   break;
+
+            default:
+            {}  break;
+        }
+    }
+    
 private:
     GridParams parameters_;
 };
