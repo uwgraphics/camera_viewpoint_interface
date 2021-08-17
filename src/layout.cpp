@@ -16,20 +16,20 @@ const std::string Layout::getLayoutName() const
 
 void Layout::setActiveFrame(uint index)
 {
-    if (index >= primary_ring_.size()) {
+    if (index >= display_states_.getNumActiveDisplays()) {
         return;
     }
 
-    primary_ring_.setActiveFrameByIndex(index);
+    display_states_.setActiveFrameByIndex(index);
 }
 
 const std::vector<float>& Layout::getActiveDisplayMatrix() const
 {
-    if (primary_ring_.empty()) {
+    if (display_states_.empty()) {
         return kDummyMatrix;
     }
 
-    return displays_.getDisplayMatrixById(primary_ring_.getActiveFrameDisplayId());
+    return displays_.getDisplayMatrixById(display_states_.getActiveFrameDisplayId());
 }
 
 const std::vector<float> Layout::getDisplayBounds() const
@@ -74,10 +74,10 @@ void Layout::handleKeyInput(int key, int action, int mods)
             case GLFW_KEY_TAB:
             {
                 if (mods && GLFW_MOD_SHIFT) {
-                    primary_ring_.toPrevActiveFrame();
+                    display_states_.toPrevActiveFrame();
                 }
                 else {
-                    primary_ring_.toNextActiveFrame();
+                    display_states_.toNextActiveFrame();
                 }
             }   break;
 
@@ -111,6 +111,18 @@ const LayoutCommand Layout::translateStringInputToCommand(std::string input) con
     else if (input == "active_prev") {
         return LayoutCommand::ACTIVE_FRAME_PREV;
     }
+    else if (input == "active_up") {
+        return LayoutCommand::ACTIVE_FRAME_UP;
+    }
+    else if (input == "active_down") {
+        return LayoutCommand::ACTIVE_FRAME_DOWN;
+    }
+    else if (input == "active_left") {
+        return LayoutCommand::ACTIVE_FRAME_LEFT; 
+    }
+    else if (input == "active_right") {
+        return LayoutCommand::ACTIVE_FRAME_RIGHT;       
+    }
 
     return LayoutCommand::INVALID_COMMAND;
 }
@@ -143,12 +155,20 @@ void Layout::handleStringInput(std::string input)
 
         case LayoutCommand::ACTIVE_FRAME_NEXT:
         {
-            primary_ring_.toNextActiveFrame();
+            display_states_.toNextActiveFrame();
         }   break;
 
         case LayoutCommand::ACTIVE_FRAME_PREV:
         {
-            primary_ring_.toPrevActiveFrame();
+            display_states_.toPrevActiveFrame();
+        }   break;
+
+        case LayoutCommand::ACTIVE_FRAME_UP:
+        case LayoutCommand::ACTIVE_FRAME_DOWN:
+        case LayoutCommand::ACTIVE_FRAME_LEFT:
+        case LayoutCommand::ACTIVE_FRAME_RIGHT:
+        {
+            display_states_.handleActiveFrameDirectionInput(command);
         }   break;
 
         default:
@@ -170,19 +190,7 @@ void Layout::handleImageResponse()
 {
     for (int i(0); i < image_response_queue_.size(); ++i) {
         DisplayImageResponse &response(image_response_queue_.at(i));
-
-        switch (response.getRole())
-        {
-            case LayoutDisplayRole::Primary:
-            {
-                primary_ring_.addImageResponseForId(response.getDisplayId(), response.getGLId());
-            }   break;
-
-            case LayoutDisplayRole::Secondary:
-            {
-                secondary_ring_.addImageResponseForId(response.getDisplayId(), response.getGLId());
-            }   break;
-        }
+        display_states_.addImageResponseForId(response.getDisplayId(), response.getGLId());
     }
 
     image_response_queue_.clear();
@@ -221,122 +229,58 @@ void Layout::disableDisplayStyle()
     style.Colors[ImGuiCol_HeaderActive] = color_cache_.active;
 }
 
+void Layout::setNumDisplaysForRole(int num, LayoutDisplayRole role)
+{
+    display_states_.setNumDisplaysForRole(num, role);
+}
+
 void Layout::addDisplayByIxAndRole(uint ix, LayoutDisplayRole role)
 {
-    uint id(displays_.getDisplayId(ix));
-    switch (role)
-    {
-        case LayoutDisplayRole::Primary:
-        {    
-            addPrimaryDisplayById(id);
-        }   break;
+    // uint id(displays_.getDisplayId(ix));
+    // switch (role)
+    // {
+    //     case LayoutDisplayRole::Primary:
+    //     {    
+    //         addPrimaryDisplayById(id);
+    //     }   break;
 
-        case LayoutDisplayRole::Secondary:
-        {    
-            addSecondaryDisplayById(id);
-        }   break;
-    }
+    //     case LayoutDisplayRole::Secondary:
+    //     {    
+    //         addSecondaryDisplayById(id);
+    //     }   break;
+    // }
 }
 
-void Layout::addPrimaryDisplayById(uint id)
-{
-    primary_ring_.addDisplayId(id);
-}
+// void Layout::addPrimaryDisplayById(uint id)
+// {
+//     display_states_.addPrimaryDisplay(id);
+// }
 
-void Layout::addSecondaryDisplayById(uint id)
-{
-    secondary_ring_.addDisplayId(id);
-}
-
-void Layout::activateDisplayAtIx(uint ix)
-{
-    displays_.activateDisplay(ix);
-    primary_ring_.markDisplayActive(displays_.getDisplayId(ix));
-    secondary_ring_.markDisplayActive(displays_.getDisplayId(ix));
-}
-
-void Layout::deactivateDisplayAtIx(uint ix)
-{
-    displays_.deactivateDisplay(ix);
-
-    uint display_id(displays_.getDisplayId(ix));
-    if (primary_ring_.isDisplayInRing(display_id)) {
-        toNextDisplay(LayoutDisplayRole::Primary);
-    }
-    if (secondary_ring_.isDisplayInRing(display_id)) {
-        toNextDisplay(LayoutDisplayRole::Secondary);
-    }
-
-    primary_ring_.markDisplayInactive(display_id);
-    secondary_ring_.markDisplayInactive(display_id);
-}
+// void Layout::addSecondaryDisplayById(uint id)
+// {
+//     display_states_.addSecondaryDisplay(id);
+// }
 
 void Layout::toNextDisplay(LayoutDisplayRole role)
 {
-    DisplayRing &role_vec(getDisplaysVectorFromRole(role));
-
-    if (role_vec.size() == 0) {
-        return;
-    }
-
-    uint cur_ix(displays_.getDisplayIxById(role_vec.getActiveFrameDisplayId()));
-    uint next_ix(displays_.getNextActiveDisplayIx(cur_ix));
-
-    if (cur_ix == next_ix) {
-        return;
-    }
-
-    role_vec.switchActiveDisplay(displays_.getDisplayId(next_ix));
-}
-
-void Layout::toNextDisplayWithPush(LayoutDisplayRole role)
-{
-    DisplayRing &role_vec(getDisplaysVectorFromRole(role));
-
-    if (role_vec.size() == 0) {
-        return;
-    }
-
-    for (int i(0); i < role_vec.size(); ++i) {
-        uint cur_ix(displays_.getDisplayIxById(role_vec.getDisplayIdAt(i)));
-        uint next_ix(displays_.getNextActiveDisplayIx(cur_ix));
-
-        role_vec.switchDisplayAtIx(i, displays_.getDisplayId(next_ix));
-    }
-}
-
-void Layout::toPrevDisplayWithPush(LayoutDisplayRole role)
-{
-    DisplayRing &role_vec(getDisplaysVectorFromRole(role));
-
-    if (role_vec.size() == 0) {
-        return;
-    }
-
-    for (int i(0); i < role_vec.size(); ++i) {
-        uint cur_ix(displays_.getDisplayIxById(role_vec.getDisplayIdAt(i)));
-        uint prev_ix(displays_.getPrevActiveDisplayIx(cur_ix));
-
-        role_vec.switchDisplayAtIx(i, displays_.getDisplayId(prev_ix));
-    }
+    display_states_.toNextDisplay(role);
 }
 
 void Layout::toPrevDisplay(LayoutDisplayRole role)
 {
-    DisplayRing &role_vec(getDisplaysVectorFromRole(role));
+    display_states_.toPrevDisplay(role);
+}
 
-    if (role_vec.size() == 0) {
-        return;
-    }
+void Layout::toNextDisplayWithPush(LayoutDisplayRole role)
+{
+    // TODO: These should push secondaries as well
+    display_states_.toNextDisplay(role);
+}
 
-    uint cur_ix(displays_.getDisplayIxById(role_vec.getActiveFrameDisplayId()));
-    uint prev_ix(displays_.getPrevActiveDisplayIx(cur_ix));
-
-    if (cur_ix == prev_ix) {
-        return;
-    }
-
-    role_vec.switchActiveDisplay(displays_.getDisplayId(prev_ix));
+void Layout::toPrevDisplayWithPush(LayoutDisplayRole role)
+{
+    // TODO:
+    display_states_.toPrevDisplay(role);
 }
 
 void Layout::addImageRequestToQueue(DisplayImageRequest request)
@@ -457,20 +401,13 @@ void Layout::drawLayoutComponents()
     display_bounds_ = bounds;
 
     // Clean up and prepare for next frame
-    for (int i(0); i < primary_ring_.size(); ++i) {
-        uint prim_id(primary_ring_.getDisplayIdAt(i));
-        std::vector<uchar>& prim_data(displays_.getDisplayDataById(prim_id));
-        const DisplayInfo& prim_info(displays_.getDisplayInfoById(prim_id));
-        addImageRequestToQueue(DisplayImageRequest{prim_info.dimensions.width, prim_info.dimensions.height,
-                prim_data, prim_id, LayoutDisplayRole::Primary});
-    }
-
-    for (int i(0); i < secondary_ring_.size(); ++i) {
-        uint sec_id(secondary_ring_.getDisplayIdAt(i));
-        std::vector<uchar>& sec_data(displays_.getDisplayDataById(sec_id));
-        const DisplayInfo& sec_info(displays_.getDisplayInfoById(sec_id));
-        addImageRequestToQueue(DisplayImageRequest{sec_info.dimensions.width, sec_info.dimensions.height,
-                sec_data, sec_id, LayoutDisplayRole::Secondary});
+    auto it(display_states_.loopStart());
+    for (; it != display_states_.loopEnd(); ++it) {
+        uint disp_id(it->first);
+        std::vector<uchar>& disp_data(displays_.getDisplayDataById(disp_id));
+        const DisplayInfo& disp_info(displays_.getDisplayInfoById(disp_id));
+        addImageRequestToQueue(DisplayImageRequest{disp_info.dimensions.width, disp_info.dimensions.height,
+                disp_data, disp_id});
     }
 
     layout_components_.clear();
@@ -501,91 +438,41 @@ void Layout::displayStateValues(std::map<std::string, bool> states) const
     }
 }
 
-void Layout::drawDisplaysList(uint display_limit)
+void Layout::drawDisplaysList(uint keep_active_num)
 {
-    static std::list<uint> active_ixs_cache;
+    int total_displays(display_states_.size());
+    // If a limit is set, displays can only be manually actived (the least recently touched
+    // display is automatically deactivated). If there is no limit, the displays can be
+    // toggled on demand.
+    bool active_limited(keep_active_num > 0);
+    
+    // The for-loop below only runs once, at layout initialization
     static bool cache_init(false);
-    
-    int total_displays(displays_.getNumTotalDisplays());
-    
-    // Initial population of active display cache
-    if (!cache_init) {
-        for (uint i(0); i < total_displays; ++i) {
-            if (displays_.isDisplayIxActive(i)) {
-                active_ixs_cache.emplace_back(i);
-            }
+    uint active_num(display_states_.getNumActiveDisplays());
+    if (!cache_init && keep_active_num > 0 && active_num > keep_active_num) {
+        uint excess_num(active_num - keep_active_num);
+        for (int i(0); i < excess_num; ++i) {
+            display_states_.deactivateDisplay(display_states_.getCacheBack());
         }
 
+        display_states_.setActiveLimit(keep_active_num);
         cache_init = true;
-    }
-
-    if (display_limit > 0) { // Pare down to active display number limit
-        // Identify newly-active ixs
-        std::list<uint> newly_active_ixs; // Store ixs of displays activated since last loop
-        std::list<uint> still_active_ixs; // Store ixs that stayed active across loops
-        for (uint i(0); i < total_displays; ++i) {
-            if (displays_.isDisplayIxActive(i)) {
-                if (std::find(active_ixs_cache.begin(), active_ixs_cache.end(), i) == active_ixs_cache.end()) {
-                    newly_active_ixs.emplace_back(i); // Display was activated since last loop
-                }
-                else {
-                    still_active_ixs.emplace_back(i); // Display remained active
-                }
-            }
-        }
-
-        uint num_active_displays(newly_active_ixs.size() + still_active_ixs.size());
-        while (num_active_displays > display_limit && !still_active_ixs.empty()) {
-            // Draw down the more 'stale' displays first to get to the limit
-            uint ix(still_active_ixs.front());
-            deactivateDisplayAtIx(ix);
-
-            still_active_ixs.pop_front();
-            --num_active_displays;
-        }
-        while (num_active_displays > display_limit) {
-            // Draw down the newly-activated displays
-            // NOTE: This should probably never be necessary since there is probably no more 
-            // than one display activated since the previous loop. There is also no check on
-            // the list size since an empty list would be problematic either way.
-            uint ix(newly_active_ixs.front());
-            deactivateDisplayAtIx(ix);
-
-            newly_active_ixs.pop_front();
-            --num_active_displays; 
-        }
-
-        // Update active display cache
-        active_ixs_cache.clear();
-        for (uint ix : still_active_ixs) {
-            active_ixs_cache.emplace_back(ix);
-        }
-        for (uint ix : newly_active_ixs) {
-            active_ixs_cache.emplace_back(ix);
-        }
-    }
-    else { // display_limit == 0 indicates no limit on number of active displays
-        // Update active display cache
-        active_ixs_cache.clear();
-        for (uint i(0); i < total_displays; ++i) {
-            if (displays_.isDisplayIxActive(i)) {
-                active_ixs_cache.emplace_back(i);
-            }
-        }
     }
 
     const int max_items(5); // Max number of displays to list w/o scrolling
     int opt_shown(total_displays > max_items ? max_items : total_displays);
     if (ImGui::ListBoxHeader("Available\nDisplays", total_displays, opt_shown)) {
-        for (uint i(0); i < total_displays; ++i) {
-            bool active(displays_.isDisplayIxActive(i));
+        auto it(display_states_.loopStart());
+        for (; it != display_states_.loopEnd(); ++it) {
+            uint id(it->first);
+            bool active(display_states_.isDisplayActive(id));
 
-            if (ImGui::Selectable(displays_.getDisplayInternalName(i).c_str(), active)) {
-                if (displays_.isDisplayIxActive(i) && displays_.getNumActiveDisplays() > 1) {
-                    deactivateDisplayAtIx(i);
+            if (ImGui::Selectable(displays_.getDisplayInternalNameById(id).c_str(), active)) {
+                if (active && !active_limited) {
+                    display_states_.deactivateDisplay(id);
                 }
-                else if (!displays_.isDisplayIxActive(i)) {
-                    activateDisplayAtIx(i);
+                else if (!active) {
+                    display_states_.activateDisplay(id);
                 }
             }
         }
@@ -596,134 +483,123 @@ void Layout::drawDisplaysList(uint display_limit)
     ImGui::Separator();
 }
 
-void Layout::drawDisplaySelector(uint num, std::string title, LayoutDisplayRole role)
+void Layout::drawDisplaySelectors()
 {
-    DisplayRing &role_vec(getDisplaysVectorFromRole(role));
-    if (role_vec.size() <= num) {
-        return;
-    }
-
-    std::string label(title);
-    switch (role)
-    {
-        case LayoutDisplayRole::Primary:
-        {
-            if (title.compare("") == 0) {
-                label = "Primary Display " + num;
-            }
-        }   break;
-
-        case LayoutDisplayRole::Secondary:
-        {
-            if (title.compare("") == 0) {
-                label = "Secondary Display " + num;
-            }
-        }   break;
-    }
+    DisplayRing& ring(display_states_.getDisplayRing());
 
     static ImGuiComboFlags flags(0);
     flags |= ImGuiComboFlags_PopupAlignLeft;
+    if (display_states_.getPrimaryLimitNum() != -1) {
+        std::vector<uint> prim_list(ring.getDisplayRoleList(LayoutDisplayRole::Primary));
+        for (int i(0); i < prim_list.size(); ++i) {
+            std::string label("Primary Display " + std::to_string(i));
+            int cur_prim_id(prim_list.at(i));
+            std::string preview(displays_.getDisplayInternalNameById(cur_prim_id));
+            if (ImGui::BeginCombo(label.c_str(), preview.c_str(), flags))
+            {
+                auto it(ring.loopStart());
+                for (; it != ring.loopEnd(); ++it) {
+                    uint id_to_list(*it);
+                    bool cur_active_id(id_to_list == cur_prim_id);
+                    if (ring.isPrimaryDisplay(id_to_list) && !cur_active_id) {
+                        continue;
+                    }
 
-    uint display_id(role_vec.getDisplayIdAt(num));
-    std::string preview(displays_.getDisplayInternalNameById(display_id));
-    if (ImGui::BeginCombo(label.c_str(), preview.c_str(), flags))
-    {
-        int cur_ix(-1);
-        for (int i(0); i < displays_.getNumActiveDisplays(); ++i)
-        {
-            cur_ix = displays_.getNextActiveDisplayIx(cur_ix);
+                    std::string disp_name(displays_.getDisplayInternalNameById(id_to_list));
+                    if (ImGui::Selectable(disp_name.c_str(), cur_active_id) && !cur_active_id) {
+                        ring.unsetDisplayRole(cur_prim_id, LayoutDisplayRole::Primary);
+                        ring.setDisplayRole(id_to_list, LayoutDisplayRole::Primary);
 
-            const bool in_vec(displays_.getDisplayId(cur_ix) == display_id);
-            std::string disp_name(displays_.getDisplayInternalName(cur_ix));
-            if (ImGui::Selectable(disp_name.c_str(), in_vec)) {
-                role_vec.switchDisplayAtIx(num, displays_.getDisplayId(cur_ix));
-            }
+                        if (ring.getActiveFrameDisplayId() == cur_prim_id) {
+                            ring.setActiveFrameById(id_to_list);
+                        }
+                    }
 
-            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-            if (in_vec) {
-                ImGui::SetItemDefaultFocus();
+                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                    if (cur_active_id) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+
+                ImGui::EndCombo();
             }
         }
+    }
 
-        ImGui::EndCombo();
+    if (display_states_.getSecondaryLimitNum() != -1) {
+        std::vector<uint> sec_list(ring.getDisplayRoleList(LayoutDisplayRole::Secondary));
+        for (int i(0); i < sec_list.size(); ++i) {
+            std::string label("Secondary Display " + std::to_string(i));
+            int cur_sec_id(sec_list.at(i));
+            std::string preview(displays_.getDisplayInternalNameById(cur_sec_id));
+            if (ImGui::BeginCombo(label.c_str(), preview.c_str(), flags))
+            {
+                auto it(ring.loopStart());
+                for (; it != ring.loopEnd(); ++it) {
+                    uint id_to_list(*it);
+                    bool cur_active_id(id_to_list == cur_sec_id);
+                    if (ring.isSecondaryDisplay(id_to_list) && !cur_active_id) {
+                        continue;
+                    }
+
+                    std::string disp_name(displays_.getDisplayInternalNameById(id_to_list));
+                    if (ImGui::Selectable(disp_name.c_str(), cur_active_id) && !cur_active_id) {
+                        ring.unsetDisplayRole(cur_sec_id, LayoutDisplayRole::Secondary);
+                        ring.setDisplayRole(id_to_list, LayoutDisplayRole::Secondary);
+                    }
+
+                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                    if (cur_active_id) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+
+                ImGui::EndCombo();
+            }
+        }
     }
 }
 
 void Layout::drawDraggableRing()
 {
-    // Primary displays
-    uint prim_num(primary_ring_.size());
-    if (ImGui::ListBoxHeader("Primary", prim_num)) {
-        for (int i(0); i < prim_num; ++i) {
-            uint id(primary_ring_.getDisplayIdAt(i));
-            if (!displays_.isDisplayIdActive(id)) {
-                continue;
+    uint num_displays(display_states_.getNumActiveDisplays());
+    if (ImGui::ListBoxHeader("Display Ring", num_displays)) {
+        DisplayRing& ring(display_states_.getDisplayRing());
+        auto it(ring.loopStart());
+        for (; it != ring.loopEnd(); ++it) {
+            uint id(*it);
+            bool has_role(false);
+            if (ring.isPrimaryDisplay(id)) {
+                enableDisplayStyle(LayoutDisplayRole::Primary);
+                has_role = true;
+            }
+            else if (ring.isSecondaryDisplay(id)) {
+                enableDisplayStyle(LayoutDisplayRole::Secondary);
+                has_role = true;
             }
 
-            enableDisplayStyle(LayoutDisplayRole::Primary);
-            ImGui::Selectable(displays_.getDisplayInternalNameById(id).c_str(), true);
-            disableDisplayStyle();
+            ImGui::Selectable(displays_.getDisplayInternalNameById(id).c_str(), true);                
+            
+            if (has_role) {
+                disableDisplayStyle();
+            }
 
             if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {
                 int delta(ImGui::GetMouseDragDelta(0).y);
                 if (std::abs(delta) > 1e-5) {
-                    primary_ring_.swapDisplayPositionsInRing(id, delta);
-                    ImGui::ResetMouseDragDelta();
+                    ring.swapDisplays(id, delta);
                 }
+            }
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::ResetMouseDragDelta();  
             }
         }
 
         ImGui::ListBoxFooter();
     }
 
-    // Secondary displays
-    uint sec_num(secondary_ring_.size());
-    if (sec_num == 0) {
-        return;
-    }
-    if (ImGui::ListBoxHeader("Secondary", sec_num)) {
-        for (int i(0); i < sec_num; ++i) {
-            uint id(secondary_ring_.getDisplayIdAt(i));
-            if (!displays_.isDisplayIdActive(id)) {
-                continue;
-            }
-
-            enableDisplayStyle(LayoutDisplayRole::Secondary);
-            ImGui::Selectable(displays_.getDisplayInternalNameById(id).c_str(), true);
-            disableDisplayStyle();
-
-            if (ImGui::IsItemActive() && !ImGui::IsItemHovered()) {
-                int delta(ImGui::GetMouseDragDelta(0).y);
-                if (std::abs(delta) > 1e-5) {
-                    secondary_ring_.swapDisplayPositionsInRing(id, delta);
-                    ImGui::ResetMouseDragDelta();
-                }
-            }
-        }
-
-        ImGui::ListBoxFooter();
-    }
-}
-
-
-// --- Private ---
-
-DisplayRing& Layout::getDisplaysVectorFromRole(LayoutDisplayRole role)
-{
-    switch (role)
-    {
-        case LayoutDisplayRole::Primary:
-        {
-            return primary_ring_;
-        }   break;
-
-        case LayoutDisplayRole::Secondary:
-        {
-            return secondary_ring_;
-        }   break;
-    }
-
-    return primary_ring_; // Not expected to hit this
+    drawDisplaySelectors();
 }
 
 

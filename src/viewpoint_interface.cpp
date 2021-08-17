@@ -131,7 +131,7 @@ bool App::initializeSocket()
     socket_.address.sin_port = htons(socket_.PORT);
 
     if (bind(socket_.socket, (const sockaddr *)&socket_.address, sizeof(socket_.address)) < 0) { 
-        printText("Socket binding failed."); 
+        printText("Socket binding failed.");
         return false;
     }
 
@@ -351,10 +351,11 @@ void App::handleMouseScroll(GLFWwindow* window, double x_offset, double y_offset
 std::string getSocketData(Socket &sock)
 {
     int len_data;
-    len_data = recvfrom(sock.socket, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.address), &(sock.len)); 
-    // while (len_data == -1 && ros::ok()) {
-    //     len_data = recvfrom(sock.socket, sock.buffer, sock.DATA_SIZE, MSG_WAITALL, (sockaddr *) &(sock.address), &(sock.len));   
-    // }
+    len_data = recv(sock.socket, sock.buffer, sock.DATA_SIZE, 0); 
+    while (len_data == -1 && ros::ok())
+    {
+        len_data = recv(sock.socket, sock.buffer, sock.DATA_SIZE, 0);   
+    }
     sock.buffer[len_data] = '\0';
     std::string data = sock.buffer;
 
@@ -521,7 +522,7 @@ void App::handleDisplayImageQueue()
                 (GLvoid*)request.getDataVector().data());
 
 
-        layouts_.pushImageResponse(DisplayImageResponse{cur_id, request.getDisplayId(), request.getRole()});
+        layouts_.pushImageResponse(DisplayImageResponse{cur_id, request.getDisplayId()});
     }
 
     queue.clear();

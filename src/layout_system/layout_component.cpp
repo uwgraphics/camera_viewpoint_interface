@@ -14,7 +14,7 @@ const std::vector<float> LayoutComponent::getDisplayBounds() const
         case Type::Primary:
         {
             float x_pos, y_pos, width, height;
-            uint total_displays(layout_.primary_ring_.size());
+            uint total_displays(layout_.display_states_.getDisplayRing().getNumPrimaryDisplays());
             for (uint i = 0; i < total_displays; ++i) {
                 getPrimaryDisplayPositionAndSize(i, total_displays, x_pos, y_pos, width, height);
                 
@@ -246,9 +246,12 @@ void LayoutComponent::getPrimaryDisplayPositionAndSize(uint cur_display, uint nu
 
 void LayoutComponent::drawPrimaryWindows() const
 {
-    uint num_displays(layout_.primary_ring_.size());
-
-    for (int i = 0; i < num_displays; ++i) {
+    Layout::DisplayRing& ring(layout_.display_states_.getDisplayRing());
+    auto primary_displays(ring.getDisplayRoleList(LayoutDisplayRole::Primary));
+    uint num_displays(primary_displays.size());
+    
+    uint cur_num(0);
+    for (uint display_id : primary_displays) {
         ImGuiWindowFlags win_flags = 0;
         win_flags |= ImGuiWindowFlags_NoDecoration;
         win_flags |= ImGuiWindowFlags_NoInputs;
@@ -257,12 +260,11 @@ void LayoutComponent::drawPrimaryWindows() const
         win_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus; // Otherwise, it overlays everything
 
         float x_pos, y_pos, win_width, win_height;
-        getPrimaryDisplayPositionAndSize(i, num_displays, x_pos, y_pos, win_width, win_height);
+        getPrimaryDisplayPositionAndSize(cur_num, num_displays, x_pos, y_pos, win_width, win_height);
         ImGui::SetNextWindowPos(ImVec2(x_pos, y_pos), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(win_width, win_height));
 
         // Maintain the right aspect ratio
-        uint display_id(layout_.primary_ring_.getDisplayIdAt(i));
         const DisplayInfo &disp_info(layout_.displays_.getDisplayInfoById(display_id));
         float aspect_ratio((float)disp_info.dimensions.width / disp_info.dimensions.height);
 
@@ -277,19 +279,20 @@ void LayoutComponent::drawPrimaryWindows() const
             img_width = img_height * aspect_ratio;
         }
 
-        if (num_displays > 1 && display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
+        bool active_frame(cur_num == ring.getActiveFrameIndex());
+        if (num_displays > 1 && active_frame) {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0);
             ImGui::PushStyleColor(ImGuiCol_Border, layout_.kActiveBorderColor);
         }
 
-        std::string menu_name("Primary Display " + std::to_string(i));
+        std::string menu_name("Primary Display " + std::to_string(cur_num));
         if (startMenu(menu_name, win_flags)) {
             // Center the image on the window
             ImVec2 image_pos(ImVec2{(ImGui::GetWindowSize().x - img_width) * 0.5f, 
                                         (ImGui::GetWindowSize().y - img_height) * 0.5f});
             ImGui::SetCursorPos(image_pos);
 
-            ImGui::Image(reinterpret_cast<ImTextureID>(layout_.primary_ring_.getImageIdForDisplayId(display_id)), ImVec2 {img_width, img_height});
+            ImGui::Image(reinterpret_cast<ImTextureID>(ring.getImageIdForDisplayId(display_id)), ImVec2 {img_width, img_height});
             
             // Show camera external name on top of image
             ImGui::SetCursorPos({image_pos.x + 10, image_pos.y + 5});
@@ -299,10 +302,12 @@ void LayoutComponent::drawPrimaryWindows() const
             endMenu();
         }
 
-        if (num_displays > 1 && display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
+        if (num_displays > 1 && active_frame) {
             ImGui::PopStyleVar();
             ImGui::PopStyleColor();
         }
+
+        ++cur_num;
     }
 }
 
@@ -325,9 +330,9 @@ void LayoutComponent::getCarouselRibbonPosAndDisplaysPosAndSize(ImVec2 &ribbon_p
         num_displays = (height_ - padding) / (display_size.y + padding);
     }
 
-    if (layout_.secondary_ring_.size() < num_displays) {
-        num_displays = layout_.secondary_ring_.size();
-    }
+    // if (layout_.secondary_ring_.size() < num_displays) {
+    //     num_displays = layout_.secondary_ring_.size();
+    // }
 
     // Calculate the display position within the ribbon. In the future, 
     // this could also calculate a variable size for certain displays
@@ -362,60 +367,60 @@ void LayoutComponent::getCarouselRibbonPosAndDisplaysPosAndSize(ImVec2 &ribbon_p
 
 void LayoutComponent::drawCarouselRibbon() const
 {
-    ImGuiWindowFlags win_flags = 0;
-    win_flags |= ImGuiWindowFlags_NoDecoration;
-    win_flags |= ImGuiWindowFlags_NoInputs;
-    win_flags |= ImGuiWindowFlags_NoSavedSettings;
-    win_flags |= ImGuiWindowFlags_NoMove;
+    // ImGuiWindowFlags win_flags = 0;
+    // win_flags |= ImGuiWindowFlags_NoDecoration;
+    // win_flags |= ImGuiWindowFlags_NoInputs;
+    // win_flags |= ImGuiWindowFlags_NoSavedSettings;
+    // win_flags |= ImGuiWindowFlags_NoMove;
 
-    std::vector<ImVec4> display_dim_data;
-    ImVec2 ribbon_pos;
-    getCarouselRibbonPosAndDisplaysPosAndSize(ribbon_pos, display_dim_data);
-    ImGui::SetNextWindowPos(ribbon_pos);
-    ImGui::SetNextWindowSize(ImVec2(width_, height_));
+    // std::vector<ImVec4> display_dim_data;
+    // ImVec2 ribbon_pos;
+    // getCarouselRibbonPosAndDisplaysPosAndSize(ribbon_pos, display_dim_data);
+    // ImGui::SetNextWindowPos(ribbon_pos);
+    // ImGui::SetNextWindowSize(ImVec2(width_, height_));
     
-    ImGuiStyle& style(ImGui::GetStyle());
-    float orig_border_size(style.WindowBorderSize);
-    ImVec4 orig_border_color(style.Colors[ImGuiCol_Border]);
-    if (startMenu("Carousel", win_flags)) {
-        win_flags |= ImGuiWindowFlags_NoBackground;
-        win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+    // ImGuiStyle& style(ImGui::GetStyle());
+    // float orig_border_size(style.WindowBorderSize);
+    // ImVec4 orig_border_color(style.Colors[ImGuiCol_Border]);
+    // if (startMenu("Carousel", win_flags)) {
+    //     win_flags |= ImGuiWindowFlags_NoBackground;
+    //     win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
 
-        for (uint i(0); i < display_dim_data.size(); ++i) {
-            ImVec2 display_pos(ribbon_pos.x + display_dim_data[i].x, ribbon_pos.y + display_dim_data[i].y);
-            ImGui::SetNextWindowPos(display_pos);
-            uint display_id(layout_.secondary_ring_.getDisplayIdAt(i));
+    //     for (uint i(0); i < display_dim_data.size(); ++i) {
+    //         ImVec2 display_pos(ribbon_pos.x + display_dim_data[i].x, ribbon_pos.y + display_dim_data[i].y);
+    //         ImGui::SetNextWindowPos(display_pos);
+    //         uint display_id(layout_.secondary_ring_.getDisplayIdAt(i));
 
-            if (display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
-                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0);
-                ImGui::PushStyleColor(ImGuiCol_Border, layout_.kActiveBorderColor);
-                win_flags ^= ImGuiWindowFlags_NoBackground;
-            }
+    //         if (display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
+    //             ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0);
+    //             ImGui::PushStyleColor(ImGuiCol_Border, layout_.kActiveBorderColor);
+    //             win_flags ^= ImGuiWindowFlags_NoBackground;
+    //         }
 
-            std::string title("Carousel Display " + std::to_string(i));
-            if (startMenu(title, win_flags)) {
-                ImGui::SetCursorPos(ImVec2(0.0, 0.0));
+    //         std::string title("Carousel Display " + std::to_string(i));
+    //         if (startMenu(title, win_flags)) {
+    //             ImGui::SetCursorPos(ImVec2(0.0, 0.0));
 
-                ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(display_id)), 
-                    ImVec2{display_dim_data[i].z, display_dim_data[i].w});
+    //             ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(display_id)), 
+    //                 ImVec2{display_dim_data[i].z, display_dim_data[i].w});
                 
-                // Show camera external name on top of image
-                ImGui::SetCursorPos(ImVec2(10, 5));
-                const std::string &title(layout_.displays_.getDisplayExternalNameById(display_id));
-                ImGui::Text(title.c_str());
+    //             // Show camera external name on top of image
+    //             ImGui::SetCursorPos(ImVec2(10, 5));
+    //             const std::string &title(layout_.displays_.getDisplayExternalNameById(display_id));
+    //             ImGui::Text(title.c_str());
 
-                endMenu();
-            }
+    //             endMenu();
+    //         }
 
-            if (display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
-                ImGui::PopStyleVar();
-                ImGui::PopStyleColor();
-                win_flags |= ImGuiWindowFlags_NoBackground;
-            }
-        }
+    //         if (display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
+    //             ImGui::PopStyleVar();
+    //             ImGui::PopStyleColor();
+    //             win_flags |= ImGuiWindowFlags_NoBackground;
+    //         }
+    //     }
 
-        endMenu();
-    }
+    //     endMenu();
+    // }
 }
 
 void LayoutComponent::getPiPWindowPosition(ImVec2 &pos) const
@@ -458,16 +463,17 @@ void LayoutComponent::drawPiPWindow() const
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
 
     if (startMenu("Picture-in-Picture", win_flags)) {
-        if (layout_.secondary_ring_.empty()) { 
+        Layout::DisplayRing& ring(layout_.display_states_.getDisplayRing());
+        if (ring.getNumSecondaryDisplays() == 0) { 
             ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "No secondary displays specified.");
             endMenu();
             return;
         }
 
-        uint active_id(layout_.secondary_ring_.getActiveFrameDisplayId());
+        uint active_id(ring.getDisplayRoleList(LayoutDisplayRole::Secondary).at(0));
         std::string title(layout_.displays_.getDisplayExternalNameById(active_id));
         ImGui::Text("%s", title.c_str());
-        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(active_id)),
+        ImGui::Image(reinterpret_cast<ImTextureID>(ring.getImageIdForDisplayId(active_id)),
             ImVec2(width_, height_));
         endMenu();
     }
@@ -498,42 +504,42 @@ void LayoutComponent::getDoublePiPWindowPositions(ImVec4 &pos) const
 
 void LayoutComponent::drawDoublePiPWindows() const
 {
-    ImGuiWindowFlags win_flags(0);
-    win_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
-    win_flags |= ImGuiWindowFlags_NoTitleBar;
-    win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+    // ImGuiWindowFlags win_flags(0);
+    // win_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
+    // win_flags |= ImGuiWindowFlags_NoTitleBar;
+    // win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
 
-    ImVec4 windows_pos;
-    getDoublePiPWindowPositions(windows_pos);
+    // ImVec4 windows_pos;
+    // getDoublePiPWindowPositions(windows_pos);
 
-    ImGui::SetNextWindowPos(ImVec2{windows_pos.x, windows_pos.y}, ImGuiCond_Once);
-    if (startMenu("Picture-in-Picture 1", win_flags)) {
-        if (layout_.secondary_ring_.empty()) { 
-            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "No secondary displays specified.");
-            endMenu();
-            return;
-        }
+    // ImGui::SetNextWindowPos(ImVec2{windows_pos.x, windows_pos.y}, ImGuiCond_Once);
+    // if (startMenu("Picture-in-Picture 1", win_flags)) {
+    //     if (layout_.secondary_ring_.empty()) { 
+    //         ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "No secondary displays specified.");
+    //         endMenu();
+    //         return;
+    //     }
 
-        uint active_id(layout_.secondary_ring_.getActiveFrameDisplayId());
-        std::string title(layout_.displays_.getDisplayExternalNameById(active_id));
-        ImGui::Text("%s", title.c_str());
-        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(active_id)),
-            ImVec2(width_, height_));
-        endMenu();
-    }
+    //     uint active_id(layout_.secondary_ring_.getActiveFrameDisplayId());
+    //     std::string title(layout_.displays_.getDisplayExternalNameById(active_id));
+    //     ImGui::Text("%s", title.c_str());
+    //     ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(active_id)),
+    //         ImVec2(width_, height_));
+    //     endMenu();
+    // }
 
-    // Since window above returns when there are no secondary displays, it shouldn't be
-    // necessary to check again
-    ImGui::SetNextWindowPos(ImVec2{windows_pos.z, windows_pos.w}, ImGuiCond_Once);
-    if (startMenu("Picture-in-Picture 2", win_flags)) {
-        // This will get the active display again if there's only one active
-        uint next_id(layout_.secondary_ring_.getNextActiveFrameDisplayId());
-        std::string title(layout_.displays_.getDisplayExternalNameById(next_id));
-        ImGui::Text("%s", title.c_str());
-        ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(next_id)),
-            ImVec2(width_, height_));
-        endMenu();
-    }
+    // // Since window above returns when there are no secondary displays, it shouldn't be
+    // // necessary to check again
+    // ImGui::SetNextWindowPos(ImVec2{windows_pos.z, windows_pos.w}, ImGuiCond_Once);
+    // if (startMenu("Picture-in-Picture 2", win_flags)) {
+    //     // This will get the active display again if there's only one active
+    //     uint next_id(layout_.secondary_ring_.getNextActiveFrameDisplayId());
+    //     std::string title(layout_.displays_.getDisplayExternalNameById(next_id));
+    //     ImGui::Text("%s", title.c_str());
+    //     ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(next_id)),
+    //         ImVec2(width_, height_));
+    //     endMenu();
+    // }
 }
 
 } // viewpoint_interface

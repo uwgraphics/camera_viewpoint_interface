@@ -11,9 +11,8 @@
 #include <GLFW/glfw3.h>
 #include <imgui/imgui.h>
 
-#include "layout_component.hpp"
 #include "display.hpp"
-#include "display_ring.hpp"
+#include "layout_component.hpp"
 #include "timer.hpp"
 #include "scoreboard.hpp"
 
@@ -73,7 +72,11 @@ enum LayoutCommand
     SECONDARY_PREV,
     TOGGLE,
     ACTIVE_FRAME_NEXT,
-    ACTIVE_FRAME_PREV
+    ACTIVE_FRAME_PREV,
+    ACTIVE_FRAME_UP,
+    ACTIVE_FRAME_DOWN,
+    ACTIVE_FRAME_LEFT,
+    ACTIVE_FRAME_RIGHT    
 };
 
 enum class LayoutDisplayRole
@@ -86,33 +89,28 @@ enum class LayoutDisplayRole
 struct DisplayImageRequest
 {
 public:
-    DisplayImageRequest(uint w, uint h, std::vector<uchar> &data, uint id, LayoutDisplayRole role) :
-            width_(w), height_(h), data_(data), disp_id_(id), role_(role) {}
+    DisplayImageRequest(uint w, uint h, std::vector<uchar> &data, uint id) :
+            width_(w), height_(h), data_(data), disp_id_(id) {}
 
     uint getWidth() const { return width_; }
     uint getHeight() const { return height_; }
     uint getDisplayId() const { return disp_id_; }
-    LayoutDisplayRole getRole() const { return role_; }
     std::vector<uchar>& getDataVector() { return data_; }
 
 private:
     std::vector<uchar> &data_;
     uint width_, height_, disp_id_;
-    LayoutDisplayRole role_;
 };
 
 struct DisplayImageResponse
 {
 public:
-    DisplayImageResponse(uint gl_id, uint id, LayoutDisplayRole role) : gl_id_(gl_id), disp_id_(id),
-            role_(role) {}
+    DisplayImageResponse(uint gl_id, uint id) : gl_id_(gl_id), disp_id_(id) {}
 
     uint getGLId() const { return gl_id_; }
     uint getDisplayId() const { return disp_id_; }
-    LayoutDisplayRole getRole() const { return role_; }
 
 private:
-    LayoutDisplayRole role_;
     uint gl_id_, disp_id_;
 };
 
@@ -168,12 +166,135 @@ protected:
     std::vector<DisplayImageRequest> display_image_queue_;
     std::vector<DisplayImageResponse> image_response_queue_;
     Scoreboard scoreboard_;
+    
+    class DisplayStateCache
+    {
+    public:
+        void touchDisplay(uint id);
+        void reverseCache();
+        void printCache();
+        
+        uint getFront() const { return cache_.front(); }
+        uint getBack() const { return cache_.back(); }
+        auto loopStart() const { return cache_.begin(); }
+        auto loopEnd() const { return cache_.end(); }
 
-    // States
+    private:
+        std::list<uint> cache_;
+    };
+
+    class DisplayRing
+    {
+    public:
+        DisplayRing();
+
+        auto loopStart() const { return ring_.begin(); }
+        auto loopEnd() const { return ring_.end(); }
+
+        void pushDisplay(uint id);
+        void removeDisplay(uint id);
+        void swapDisplays(uint id, float delta);
+        void toNextDisplay(LayoutDisplayRole role);
+        void toPrevDisplay(LayoutDisplayRole role);
+        void setDisplayRole(uint id, LayoutDisplayRole role);
+        void unsetDisplayRole(uint id, LayoutDisplayRole role);
+        void unsetRoles(uint id);
+        void unsetAllForRole(LayoutDisplayRole role);
+        bool isPrimaryDisplay(uint id) const;
+        bool isSecondaryDisplay(uint id) const;
+        bool isDisplayRole(uint id, LayoutDisplayRole role) const;
+        std::vector<uint> getDisplayRoleList(LayoutDisplayRole role);
+        uint getNumPrimaryDisplays() const;
+        uint getNumSecondaryDisplays() const;
+        uint getNumForRole(LayoutDisplayRole role) const;
+        uint getDisplayIdByIx(uint ix) const;
+        void setActiveFrameByIndex(uint ix);
+        void setActiveFrameById(uint id);
+        uint getActiveFrameIndex() const;
+        uint getActiveFrameDisplayId() const;
+        void toNextActiveFrame();
+        void toPrevActiveFrame();
+        void addImageResponseForId(uint display_id, uint gl_id);
+        uint getImageIdForDisplayId(uint id) const;
+
+    private:
+        std::vector<uint> ring_;
+        uint active_frame_; // Active frame points to an index position within ring_
+        std::map<uint, uint> gl_ids_; // Stores OpenGL ID for displays in ring
+        std::map<uint, bool> primary_displays_;
+        std::map<uint, bool> secondary_displays_;
+
+        void setPrimaryDisplay(uint id);
+        void setSecondaryDisplay(uint id);
+        void unsetPrimaryDisplay(uint id);
+        void unsetSecondaryDisplay(uint id);
+        uint getNextIdWithoutRole(uint start_id, LayoutDisplayRole role);
+        uint getPrevIdWithoutRole(uint start_id, LayoutDisplayRole role);
+        uint getIndexForDisplayId(uint id);
+    };
+
+    class LayoutDisplayStates
+    {
+    public:
+        LayoutDisplayStates() = delete;
+        LayoutDisplayStates(DisplayManager &displays);
+
+        uint size() const;
+        bool empty() const;
+        uint getNumActiveDisplays() const;
+        bool noDisplaysActive() const;
+        uint setActiveLimit(uint limit);
+        uint setNumDisplaysForRole(int num, LayoutDisplayRole role);
+        int getPrimaryLimitNum() const { return num_primary_; }
+        int getSecondaryLimitNum() const { return num_secondary_; }
+        std::map<uint, bool>::const_iterator loopStart() const;
+        std::map<uint, bool>::const_iterator loopEnd() const;
+        bool isDisplayActive(uint id);
+        uint getOldestActiveDisplay();
+        void activateDisplay(uint id);
+        void deactivateDisplay(uint id);
+        uint getDisplayIxById(uint id);
+        bool isDisplayIxActive(uint ix);
+        uint getNextActiveDisplayIx(int ix);
+        uint getPrevActiveDisplayIx(int ix);
+        uint getCacheFront();
+        uint getCacheBack();
+
+        // Ring functions
+        DisplayRing& getDisplayRing();
+        void setDisplayRole(uint id, LayoutDisplayRole role);
+        void toNextDisplay(LayoutDisplayRole role);
+        void toPrevDisplay(LayoutDisplayRole role);
+        void setActiveFrameByIndex(uint ix);
+        void setActiveFrameById(uint id);
+        uint getActiveFrameDisplayId() const;
+        void toNextActiveFrame();
+        void toPrevActiveFrame();
+        void handleActiveFrameDirectionInput(LayoutCommand command);
+        void addImageResponseForId(uint display_id, uint gl_id);
+        uint getImageIdForDisplayId(uint id) const;
+
+    private:
+        std::map<uint, bool> states_;
+        uint num_active_displays_;
+        uint active_limit_;
+        int num_primary_;
+        int num_secondary_;
+        DisplayStateCache display_cache_;
+        DisplayRing display_ring_;
+
+        uint nextIx(uint ix, uint size) const;
+        uint prevIx(uint ix, uint size) const;
+    };
+
+    DisplayStateCache cache;
+    LayoutDisplayStates display_states_;
+    // DisplayRing primary_ring_;
+    // DisplayRing secondary_ring_;
+
+    // Robot state data
     bool grabbing_, clutching_;
 
-    DisplayRing primary_ring_;
-    DisplayRing secondary_ring_;
 
     std::vector<LayoutComponent> layout_components_;
     std::vector<float> display_bounds_;
@@ -193,7 +314,8 @@ protected:
 
     std::vector<float> kDummyMatrix;
 
-    Layout(LayoutType type, DisplayManager &disp) : layout_type_(type), displays_(disp), kDummyMatrix(12, 0.0)
+    Layout(LayoutType type, DisplayManager &disp) : layout_type_(type), displays_(disp), kDummyMatrix(12, 0.0),
+            display_states_(displays_)
     {
         primary_color_.base =    ImVec4{10.0/255, 190.0/255, 10.0/255, 150.0/255};
         primary_color_.hovered = ImVec4{10.0/255, 190.0/255, 10.0/255, 200.0/255}; 
@@ -207,12 +329,15 @@ protected:
         kDummyMatrix[0] = 1.0;
         kDummyMatrix[5] = 1.0;
         kDummyMatrix[10] = 1.0;
+
+        clutching_ = false; grabbing_ = false;
     }
         
     virtual void handleImageResponse();
 
     void enableDisplayStyle(LayoutDisplayRole role);
     void disableDisplayStyle();
+    void setNumDisplaysForRole(int num, LayoutDisplayRole role);
     void addDisplayByIxAndRole(uint ix, LayoutDisplayRole role);
     void addPrimaryDisplayById(uint id);
     void addSecondaryDisplayById(uint id);
@@ -228,8 +353,8 @@ protected:
         float height=0.0, ImVec2 offset=ImVec2{-1.0, -1.0});
     void drawLayoutComponents();
     void displayStateValues(std::map<std::string, bool> states) const;
-    void drawDisplaysList(uint display_limit=0);
-    void drawDisplaySelector(uint num, std::string title="", LayoutDisplayRole role=LayoutDisplayRole::Primary);
+    void drawDisplaysList(uint keep_active_num=0);
+    void drawDisplaySelectors();
     void drawDraggableRing();
 
 private:
@@ -240,8 +365,6 @@ private:
     };
 
     LayoutType layout_type_;
-
-    DisplayRing& getDisplaysVectorFromRole(LayoutDisplayRole role);
 
     friend class LayoutComponent;
 };

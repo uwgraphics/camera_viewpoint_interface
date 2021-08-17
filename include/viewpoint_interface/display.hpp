@@ -53,7 +53,7 @@ namespace viewpoint_interface
     public:
 
         Display(std::string &internal, std::string &external, std::string &topic, const DisplayDims &dims) :
-                info(internal, external, topic, dims), active(true)
+                info(internal, external, topic, dims)
         {
             info.id = getNextId();
         }
@@ -67,23 +67,12 @@ namespace viewpoint_interface
         inline const DisplayInfo& getDisplayInfo() const { return info; }
 
     private:
-        bool active;
         DisplayInfo info;
 
         uint getNextId() 
         { 
             static uint current_id = 100;
             return current_id++;
-        }
-
-        bool isActive() const { return active; }
-        void activate() { active = true; }
-        void deactivate() { active = false; }
-        bool flipState() 
-        { 
-            bool new_state = !active;
-            active = new_state; 
-            return new_state;
         }
 
         void copyImage(const cv::Mat &image)
@@ -103,7 +92,7 @@ namespace viewpoint_interface
     class DisplayManager
     {
     public:
-        DisplayManager() {}
+        DisplayManager() : num_active_displays(0) {}
 
         void addDisplay(const Display &disp)
         {
@@ -111,34 +100,6 @@ namespace viewpoint_interface
 
             displays.push_back(disp);
             num_active_displays++;
-        }
-
-        bool isDisplayIxActive(uint ix) const { return displays[ix].isActive(); }
-        bool isDisplayIdActive(uint id) const { return displays.at(getDisplayIxById(id)).isActive(); }
-        void activateDisplay(uint ix)
-        { 
-            if (displays[ix].isActive()) {
-                return;
-            }
-
-            displays[ix].activate(); 
-            num_active_displays++; 
-        }
-
-        void deactivateDisplay(uint ix) 
-        { 
-            displays[ix].deactivate();
-            num_active_displays--;
-        }
-
-        void flipDisplayState(uint ix) 
-        {
-            if (displays[ix].flipState()) {
-                num_active_displays++;
-            }
-            else {
-                num_active_displays--;
-            }
         }
 
         uint getDisplayId(uint ix) const
@@ -221,42 +182,6 @@ namespace viewpoint_interface
             return 0;
         }
 
-        uint getNextActiveDisplayIx(int ix) const
-        {
-            if (num_active_displays == 0) { return 0; }
-
-            uint next_ix = nextIx(ix, displays.size());
-            while (!isDisplayIxActive(next_ix))
-            {
-                next_ix = nextIx(next_ix, displays.size());
-            }
-            
-            return next_ix;
-        }
-
-        uint getNextActiveDisplayId(int ix) const
-        {
-            return getDisplayId(getNextActiveDisplayIx(ix));
-        }
-
-        uint getPrevActiveDisplayIx(int ix) const
-        {
-            if (num_active_displays == 0) { return 0; }
-
-            uint prev_ix = prevIx(ix, displays.size());
-            while (!isDisplayIxActive(prev_ix))
-            {
-                prev_ix = prevIx(prev_ix, displays.size());
-            }
-            
-            return prev_ix;
-        }
-
-        uint getPrevActiveDisplayId(int ix) const
-        {
-            return getDisplayId(getPrevActiveDisplayIx(ix));
-        }
-
         void swapDisplays(uint ix1, uint ix2)
         {
             std::vector<Display> &vec(displays);
@@ -277,7 +202,7 @@ namespace viewpoint_interface
 
 
     private:       
-        uint num_active_displays = 0;
+        uint num_active_displays;
         std::vector<Display> displays;
 
 

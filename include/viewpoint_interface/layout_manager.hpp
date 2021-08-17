@@ -133,9 +133,9 @@ public:
     }
 
 private:
+    DisplayManager displays_;
     std::shared_ptr<Layout> active_layout_;
     std::shared_ptr<Layout> previous_layout_;
-    DisplayManager displays_;
 
     const std::string kControlPanelTitle = "Layouts Control Panel";
     const std::string kButtonsPanelTitle = "Buttons Panel";
