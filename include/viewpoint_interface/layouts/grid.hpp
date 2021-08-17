@@ -60,8 +60,30 @@ public:
                 display_states_.handleActiveFrameDirectionInput(command);
             }   break;
 
-            default:
-            {}  break;
+            case LayoutCommand::ACTIVE_FRAME_UP_RIGHT:
+            {
+                display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_UP);
+                display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_RIGHT);
+            }   break;
+
+            case LayoutCommand::ACTIVE_FRAME_UP_LEFT:
+            {
+                display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_UP);
+                display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_LEFT);
+            }   break;
+
+            case LayoutCommand::ACTIVE_FRAME_DOWN_RIGHT:
+            {
+                display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_DOWN);
+                display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_RIGHT);
+            }   break;
+
+            case LayoutCommand::ACTIVE_FRAME_DOWN_LEFT:
+            {
+                display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_DOWN);
+                display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_LEFT);
+            }   break;
+
         }
     }
     

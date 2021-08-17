@@ -123,6 +123,18 @@ const LayoutCommand Layout::translateStringInputToCommand(std::string input) con
     else if (input == "active_right") {
         return LayoutCommand::ACTIVE_FRAME_RIGHT;       
     }
+    else if (input == "active_up_right") {
+        return LayoutCommand::ACTIVE_FRAME_UP_RIGHT;       
+    }
+    else if (input == "active_up_left") {
+        return LayoutCommand::ACTIVE_FRAME_UP_LEFT;       
+    }
+    else if (input == "active_down_right") {
+        return LayoutCommand::ACTIVE_FRAME_DOWN_RIGHT;       
+    }
+    else if (input == "active_down_left") {
+        return LayoutCommand::ACTIVE_FRAME_DOWN_LEFT;       
+    }
 
     return LayoutCommand::INVALID_COMMAND;
 }
@@ -169,6 +181,30 @@ void Layout::handleStringInput(std::string input)
         case LayoutCommand::ACTIVE_FRAME_RIGHT:
         {
             display_states_.handleActiveFrameDirectionInput(command);
+        }   break;
+
+        case LayoutCommand::ACTIVE_FRAME_UP_RIGHT:
+        {
+            display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_UP);
+            display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_RIGHT);
+        }   break;
+
+        case LayoutCommand::ACTIVE_FRAME_UP_LEFT:
+        {
+            display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_UP);
+            display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_LEFT);
+        }   break;
+
+        case LayoutCommand::ACTIVE_FRAME_DOWN_RIGHT:
+        {
+            display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_DOWN);
+            display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_RIGHT);
+        }   break;
+
+        case LayoutCommand::ACTIVE_FRAME_DOWN_LEFT:
+        {
+            display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_DOWN);
+            display_states_.handleActiveFrameDirectionInput(LayoutCommand::ACTIVE_FRAME_LEFT);
         }   break;
 
         default:
