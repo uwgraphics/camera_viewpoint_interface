@@ -23,6 +23,9 @@ public:
             parameters_(params), keep_aspect_ratio_(true), pip_enabled_(false), 
             countdown_(5, Timer::DurationType::SECONDS)
     {
+        setNumDisplaysForRole(1, LayoutDisplayRole::Primary);
+        setNumDisplaysForRole(1, LayoutDisplayRole::Secondary);
+
         addDisplayByIxAndRole(parameters_.start_primary_display, LayoutDisplayRole::Primary);
         addDisplayByIxAndRole(parameters_.start_pip_display, LayoutDisplayRole::Secondary);
     }
@@ -35,9 +38,6 @@ public:
         drawDisplaysList(cur_num_displays);
 
         drawDraggableRing();
-
-        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
-        drawDisplaySelector(0, "Pic-in-Pic Display", LayoutDisplayRole::Secondary);
 
         ImGui::Separator();
 

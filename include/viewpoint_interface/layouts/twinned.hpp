@@ -18,6 +18,8 @@ public:
     TwinnedLayout(DisplayManager &displays, TwinnedParams params=TwinnedParams()) : 
             Layout(LayoutType::TWINNED, displays), parameters_(params) 
     {
+        setNumDisplaysForRole(1, LayoutDisplayRole::Primary);
+
         addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
     }
 
@@ -25,7 +27,6 @@ public:
     {
         drawDisplaysList(parameters_.max_num_displays);
         drawDraggableRing();
-        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
     }
 
     virtual void draw() override

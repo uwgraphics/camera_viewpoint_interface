@@ -19,6 +19,8 @@ public:
     SplitLayout(DisplayManager &displays, SplitParams params=SplitParams()) : Layout(LayoutType::SPLIT, displays),
             parameters_(params) 
     {
+        setNumDisplaysForRole(2, LayoutDisplayRole::Primary);
+
         addDisplayByIxAndRole(parameters_.first_primary_display, LayoutDisplayRole::Primary);
         addDisplayByIxAndRole(parameters_.second_primary_display, LayoutDisplayRole::Primary);
     }
@@ -31,8 +33,6 @@ public:
         drawDisplaysList(); 
         // ImGui::SliderInt("# Displays", (int *) &num_displays, 1, max_bound);
         drawDraggableRing();
-        drawDisplaySelector(0, "Left Display", LayoutDisplayRole::Primary);
-        drawDisplaySelector(1, "Right Display", LayoutDisplayRole::Primary);
     }
 
     virtual void draw() override

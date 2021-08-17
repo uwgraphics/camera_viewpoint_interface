@@ -18,6 +18,8 @@ public:
     GridLayout(DisplayManager &displays, GridParams params=GridParams()) : Layout(LayoutType::GRID, displays),
             parameters_(params) 
     {
+        setNumDisplaysForRole(-1, LayoutDisplayRole::Primary);
+
         for (int i = 0; i < displays_.getNumTotalDisplays(); ++i) {
             addDisplayByIxAndRole(i, LayoutDisplayRole::Primary);
         }
@@ -48,6 +50,14 @@ public:
             case LayoutCommand::TOGGLE:
             {
                 toNextDisplay(LayoutDisplayRole::Primary);
+            }   break;
+
+            case LayoutCommand::ACTIVE_FRAME_UP:
+            case LayoutCommand::ACTIVE_FRAME_DOWN:
+            case LayoutCommand::ACTIVE_FRAME_LEFT:
+            case LayoutCommand::ACTIVE_FRAME_RIGHT:
+            {
+                display_states_.handleActiveFrameDirectionInput(command);
             }   break;
 
             default:

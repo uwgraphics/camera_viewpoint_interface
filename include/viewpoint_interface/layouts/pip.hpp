@@ -22,21 +22,20 @@ public:
     PiPLayout(DisplayManager &displays, PiPParams params=PiPParams()) : Layout(LayoutType::PIP, displays),
             parameters_(params), keep_aspect_ratio_(true), pip_enabled_(true)
     {
-        addDisplayByIxAndRole(parameters_.start_primary_display, LayoutDisplayRole::Primary);
-        addDisplayByIxAndRole(parameters_.start_pip_display, LayoutDisplayRole::Secondary);
+        setNumDisplaysForRole(1, LayoutDisplayRole::Primary);
+        setNumDisplaysForRole(1, LayoutDisplayRole::Secondary);
+        // addDisplayByIxAndRole(parameters_.start_primary_display, LayoutDisplayRole::Primary);
+        // addDisplayByIxAndRole(parameters_.start_pip_display, LayoutDisplayRole::Secondary);
     }
 
     virtual void displayLayoutParams() override
     {
         static uint cur_num_displays(parameters_.max_num_displays);
 
-        ImGui::SliderInt("# Displays", (int *)&cur_num_displays, 0, parameters_.max_num_displays);
+        // ImGui::SliderInt("# Displays", (int *)&cur_num_displays, 0, parameters_.max_num_displays);
         drawDisplaysList(cur_num_displays);
 
         drawDraggableRing();
-
-        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
-        drawDisplaySelector(0, "Pic-in-Pic Display", LayoutDisplayRole::Secondary);
 
         ImGui::Separator();
 

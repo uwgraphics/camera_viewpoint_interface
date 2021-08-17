@@ -17,6 +17,8 @@ public:
     CarouselLayout(DisplayManager &displays, CarouselParams params=CarouselParams()) : 
             Layout(LayoutType::CAROUSEL, displays), parameters_(params) 
     {
+        setNumDisplaysForRole(1, LayoutDisplayRole::Primary);
+
         addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
 
         for (int i = 0; i < displays.getNumTotalDisplays(); ++i) {
@@ -28,7 +30,6 @@ public:
     {
         drawDisplaysList();
         drawDraggableRing();
-        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
     }
 
     virtual void draw() override

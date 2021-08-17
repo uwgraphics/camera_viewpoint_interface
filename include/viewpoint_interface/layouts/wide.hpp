@@ -17,6 +17,8 @@ public:
     WideLayout(DisplayManager &displays, WideParams params=WideParams()) : 
             Layout(LayoutType::WIDE, displays), parameters_(params) 
     {
+        setNumDisplaysForRole(1, LayoutDisplayRole::Primary);
+        
         addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
     }
 
@@ -24,7 +26,6 @@ public:
     {
         drawDisplaysList();
         drawDraggableRing();
-        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
     }
 
     virtual void draw() override

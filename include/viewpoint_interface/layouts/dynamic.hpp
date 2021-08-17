@@ -17,14 +17,14 @@ public:
     DynamicLayout(DisplayManager &displays, DynamicParams params=DynamicParams()) : 
             Layout(LayoutType::DYNAMIC, displays), parameters_(params)
     {
-        addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
+        setNumDisplaysForRole(1, LayoutDisplayRole::Primary);
+        // addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
     }
 
     virtual void displayLayoutParams() override
     {
         drawDisplaysList();
         drawDraggableRing();
-        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
     }
 
     virtual void draw() override

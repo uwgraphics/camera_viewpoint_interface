@@ -20,6 +20,9 @@ public:
     DoublePipLayout(DisplayManager &displays, DoublePipParams params=DoublePipParams()) : Layout(LayoutType::DOUBLE_PIP, displays),
             parameters_(params)
     {
+        setNumDisplaysForRole(1, LayoutDisplayRole::Primary);
+        setNumDisplaysForRole(2, LayoutDisplayRole::Secondary);
+
         addDisplayByIxAndRole(parameters_.start_primary_display, LayoutDisplayRole::Primary);
         addDisplayByIxAndRole(parameters_.first_pip_display, LayoutDisplayRole::Secondary);
         addDisplayByIxAndRole(parameters_.second_pip_display, LayoutDisplayRole::Secondary);
@@ -29,10 +32,6 @@ public:
     {
         drawDisplaysList(parameters_.max_num_displays);
         drawDraggableRing();
-
-        drawDisplaySelector(0, "Main Display", LayoutDisplayRole::Primary);
-        drawDisplaySelector(0, "Pic-in-Pic 1", LayoutDisplayRole::Secondary);
-        drawDisplaySelector(1, "Pic-in-Pic 2", LayoutDisplayRole::Secondary);
     }
 
     virtual void draw() override
