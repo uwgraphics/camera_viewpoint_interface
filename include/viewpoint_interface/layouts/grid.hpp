@@ -38,6 +38,7 @@ public:
 
         std::map<std::string, bool> states;
         states["Robot"] = !clutching_;
+        states["Gripper#on_off"] = grabbing_;
         displayStateValues(states);
     }
 
