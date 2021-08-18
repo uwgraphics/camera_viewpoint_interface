@@ -334,7 +334,7 @@ protected:
         kDummyMatrix[5] = 1.0;
         kDummyMatrix[10] = 1.0;
 
-        clutching_ = false; grabbing_ = false;
+        clutching_ = true; grabbing_ = false;
     }
         
     virtual void handleImageResponse();

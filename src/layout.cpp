@@ -457,17 +457,44 @@ void Layout::displayStateValues(std::map<std::string, bool> states) const
     win_flags |= ImGuiWindowFlags_NoBackground;
     win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 25, 
-            main_viewport->GetWorkPos().y + 40), ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(main_viewport->GetWorkPos().x + 20, 
+            main_viewport->GetWorkPos().y + main_viewport->GetWorkSize().y - 80), ImGuiCond_Always);
 
     if (startMenu(title, win_flags)) {
         std::map<std::string, bool>::iterator itr;
         for (itr = states.begin(); itr != states.end(); itr++) {
-            ImGui::Text("%s: ", (itr->first).c_str());
+            std::string full_string(itr->first);
+            std::size_t hash_pos(full_string.find('#'));
+            std::string title(full_string.substr(0, hash_pos));
+
+            ImGui::Text("%s: ", title.c_str());
             ImGui::SameLine();
             bool state(itr->second);
             ImVec4 state_color(state ? kOnColor : kOffColor);
-            std::string state_val(state ? "ACTIVE" : "INACTIVE");
+
+            std::string state_val;
+            if (hash_pos != std::string::npos) {
+                auto toUppercase = [](std::string str) {
+                    std::string out_str;
+                    for (int i(0); i < str.size(); ++i) {
+                        out_str += std::toupper(str.at(i));
+                    }
+                    return out_str;
+                };
+
+                std::string opt_string(full_string.substr(hash_pos));
+                std::size_t separ_pos(opt_string.find('_'));
+                std::string on_opt, off_opt;
+                if (opt_string.size() >= 4 && separ_pos != std::string::npos) {
+                    on_opt = opt_string.substr(1, separ_pos-1);
+                    off_opt = opt_string.substr(separ_pos+1);
+                }
+
+                state_val = state ? toUppercase(on_opt) : toUppercase(off_opt);
+            }
+            else {
+                state_val = state ? "ACTIVE" : "INACTIVE";
+            }
             ImGui::TextColored(state_color, state_val.c_str());
         }
         endMenu();
