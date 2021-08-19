@@ -243,14 +243,16 @@ void App::initializeImGui()
     ImGuiStyle& style = ImGui::GetStyle();
     style.ItemInnerSpacing = ImVec2(7.0, 2.0);
     style.WindowRounding = 6.0;
+    
+    if (!io_.Fonts->AddFontFromFileTTF("resources/fonts/Ubuntu-Regular.ttf", 18.0f)) {
+        printText("Could not load font.");
+    }
+
+    ImGui::GetIO() = io_;
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window_, true);
     ImGui_ImplOpenGL3_Init("#version 330");
-
-    if (!io_.Fonts->AddFontFromFileTTF("resources/fonts/Ubuntu-Regular.ttf", 18.0f)) {
-        printText("Could not load font.");
-    }
 }
 
 void App::shutdownApp()
