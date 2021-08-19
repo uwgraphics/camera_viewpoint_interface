@@ -92,6 +92,9 @@ void Layout::LayoutDisplayStates::activateDisplay(uint id)
     if (active_limit_ > 0 && num_active_displays_ > active_limit_) {
         deactivateDisplay(getOldestActiveDisplay());
     }
+    if (getPrimaryLimitNum() == -1) {
+        display_ring_.setDisplayRole(id, LayoutDisplayRole::Primary);
+    }
 }
 
 void Layout::LayoutDisplayStates::deactivateDisplay(uint id)
