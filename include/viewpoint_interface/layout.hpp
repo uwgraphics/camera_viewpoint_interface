@@ -207,7 +207,7 @@ protected:
         bool isPrimaryDisplay(uint id) const;
         bool isSecondaryDisplay(uint id) const;
         bool isDisplayRole(uint id, LayoutDisplayRole role) const;
-        std::vector<uint> getDisplayRoleList(LayoutDisplayRole role);
+        std::vector<uint> getDisplayRoleList(LayoutDisplayRole role) const;
         uint getNumPrimaryDisplays() const;
         uint getNumSecondaryDisplays() const;
         uint getNumForRole(LayoutDisplayRole role) const;

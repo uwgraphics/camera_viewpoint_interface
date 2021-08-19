@@ -209,7 +209,7 @@ bool Layout::DisplayRing::isDisplayRole(uint id, LayoutDisplayRole role) const
     }
 }
 
-std::vector<uint> Layout::DisplayRing::getDisplayRoleList(LayoutDisplayRole role)
+std::vector<uint> Layout::DisplayRing::getDisplayRoleList(LayoutDisplayRole role) const
 {
     std::vector<uint> list;
    
@@ -313,7 +313,7 @@ uint Layout::DisplayRing::getActiveFrameDisplayId() const
         return 0;
     }
 
-    return ring_.at(active_frame_);
+    return getDisplayRoleList(LayoutDisplayRole::Primary).at(active_frame_);
 }
 
 void Layout::DisplayRing::toNextActiveFrame()
