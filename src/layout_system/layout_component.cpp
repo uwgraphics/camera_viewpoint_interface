@@ -330,9 +330,10 @@ void LayoutComponent::getCarouselRibbonPosAndDisplaysPosAndSize(ImVec2 &ribbon_p
         num_displays = (height_ - padding) / (display_size.y + padding);
     }
 
-    // if (layout_.secondary_ring_.size() < num_displays) {
-    //     num_displays = layout_.secondary_ring_.size();
-    // }
+    Layout::DisplayRing& ring(layout_.display_states_.getDisplayRing());
+    if (ring.getNumSecondaryDisplays() < num_displays) {
+        num_displays = ring.getNumSecondaryDisplays();
+    }
 
     // Calculate the display position within the ribbon. In the future, 
     // this could also calculate a variable size for certain displays
@@ -367,60 +368,61 @@ void LayoutComponent::getCarouselRibbonPosAndDisplaysPosAndSize(ImVec2 &ribbon_p
 
 void LayoutComponent::drawCarouselRibbon() const
 {
-    // ImGuiWindowFlags win_flags = 0;
-    // win_flags |= ImGuiWindowFlags_NoDecoration;
-    // win_flags |= ImGuiWindowFlags_NoInputs;
-    // win_flags |= ImGuiWindowFlags_NoSavedSettings;
-    // win_flags |= ImGuiWindowFlags_NoMove;
+    ImGuiWindowFlags win_flags = 0;
+    win_flags |= ImGuiWindowFlags_NoDecoration;
+    win_flags |= ImGuiWindowFlags_NoInputs;
+    win_flags |= ImGuiWindowFlags_NoSavedSettings;
+    win_flags |= ImGuiWindowFlags_NoMove;
 
-    // std::vector<ImVec4> display_dim_data;
-    // ImVec2 ribbon_pos;
-    // getCarouselRibbonPosAndDisplaysPosAndSize(ribbon_pos, display_dim_data);
-    // ImGui::SetNextWindowPos(ribbon_pos);
-    // ImGui::SetNextWindowSize(ImVec2(width_, height_));
-    
-    // ImGuiStyle& style(ImGui::GetStyle());
-    // float orig_border_size(style.WindowBorderSize);
-    // ImVec4 orig_border_color(style.Colors[ImGuiCol_Border]);
-    // if (startMenu("Carousel", win_flags)) {
-    //     win_flags |= ImGuiWindowFlags_NoBackground;
-    //     win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+    std::vector<ImVec4> display_dim_data;
+    ImVec2 ribbon_pos;
+    getCarouselRibbonPosAndDisplaysPosAndSize(ribbon_pos, display_dim_data);
+    ImGui::SetNextWindowPos(ribbon_pos);
+    ImGui::SetNextWindowSize(ImVec2(width_, height_));
 
-    //     for (uint i(0); i < display_dim_data.size(); ++i) {
-    //         ImVec2 display_pos(ribbon_pos.x + display_dim_data[i].x, ribbon_pos.y + display_dim_data[i].y);
-    //         ImGui::SetNextWindowPos(display_pos);
-    //         uint display_id(layout_.secondary_ring_.getDisplayIdAt(i));
+    ImGuiStyle& style(ImGui::GetStyle());
+    float orig_border_size(style.WindowBorderSize);
+    ImVec4 orig_border_color(style.Colors[ImGuiCol_Border]);
+    Layout::DisplayRing& ring(layout_.display_states_.getDisplayRing());
+    if (startMenu("Carousel", win_flags)) {
+        win_flags |= ImGuiWindowFlags_NoBackground;
+        win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
 
-    //         if (display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
-    //             ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0);
-    //             ImGui::PushStyleColor(ImGuiCol_Border, layout_.kActiveBorderColor);
-    //             win_flags ^= ImGuiWindowFlags_NoBackground;
-    //         }
+        for (uint i(0); i < display_dim_data.size(); ++i) {
+            ImVec2 display_pos(ribbon_pos.x + display_dim_data[i].x, ribbon_pos.y + display_dim_data[i].y);
+            ImGui::SetNextWindowPos(display_pos);
+            uint display_id(ring.getDisplayIdByIx(i));
 
-    //         std::string title("Carousel Display " + std::to_string(i));
-    //         if (startMenu(title, win_flags)) {
-    //             ImGui::SetCursorPos(ImVec2(0.0, 0.0));
+            if (display_id == ring.getActiveFrameDisplayId()) {
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0);
+                ImGui::PushStyleColor(ImGuiCol_Border, layout_.kActiveBorderColor);
+                win_flags ^= ImGuiWindowFlags_NoBackground;
+            }
 
-    //             ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(display_id)), 
-    //                 ImVec2{display_dim_data[i].z, display_dim_data[i].w});
+            std::string title("Carousel Display " + std::to_string(i));
+            if (startMenu(title, win_flags)) {
+                ImGui::SetCursorPos(ImVec2(0.0, 0.0));
+
+                ImGui::Image(reinterpret_cast<ImTextureID>(ring.getImageIdForDisplayId(display_id)), 
+                    ImVec2{display_dim_data[i].z, display_dim_data[i].w});
                 
-    //             // Show camera external name on top of image
-    //             ImGui::SetCursorPos(ImVec2(10, 5));
-    //             const std::string &title(layout_.displays_.getDisplayExternalNameById(display_id));
-    //             ImGui::Text(title.c_str());
+                // Show camera external name on top of image
+                ImGui::SetCursorPos(ImVec2(10, 5));
+                const std::string &title(layout_.displays_.getDisplayExternalNameById(display_id));
+                ImGui::Text(title.c_str());
 
-    //             endMenu();
-    //         }
+                endMenu();
+            }
 
-    //         if (display_id == layout_.primary_ring_.getActiveFrameDisplayId()) {
-    //             ImGui::PopStyleVar();
-    //             ImGui::PopStyleColor();
-    //             win_flags |= ImGuiWindowFlags_NoBackground;
-    //         }
-    //     }
+            if (display_id == ring.getActiveFrameDisplayId()) {
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor();
+                win_flags |= ImGuiWindowFlags_NoBackground;
+            }
+        }
 
-    //     endMenu();
-    // }
+        endMenu();
+    }
 }
 
 void LayoutComponent::getPiPWindowPosition(ImVec2 &pos) const

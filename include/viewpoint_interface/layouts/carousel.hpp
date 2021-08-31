@@ -18,12 +18,13 @@ public:
             Layout(LayoutType::CAROUSEL, displays), parameters_(params) 
     {
         setNumDisplaysForRole(1, LayoutDisplayRole::Primary);
+        setNumDisplaysForRole(-1, LayoutDisplayRole::Secondary);        
 
-        addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
+        // addDisplayByIxAndRole(parameters_.primary_display, LayoutDisplayRole::Primary);
 
-        for (int i = 0; i < displays.getNumTotalDisplays(); ++i) {
-            addDisplayByIxAndRole(i, LayoutDisplayRole::Secondary);
-        }
+        // for (int i = 0; i < displays.getNumTotalDisplays(); ++i) {
+        //     addDisplayByIxAndRole(i, LayoutDisplayRole::Secondary);
+        // }
     }
 
     virtual void displayLayoutParams() override
