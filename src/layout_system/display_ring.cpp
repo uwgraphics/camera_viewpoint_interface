@@ -281,7 +281,7 @@ uint Layout::DisplayRing::getNumForRole(LayoutDisplayRole role) const
 
 uint Layout::DisplayRing::getDisplayIdByIx(uint ix) const
 {
-    ring_.at(ix);
+    return ring_.at(ix);
 }
 
 void Layout::DisplayRing::setActiveFrameByIndex(uint ix)

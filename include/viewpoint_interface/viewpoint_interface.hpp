@@ -31,7 +31,6 @@ namespace viewpoint_interface
 
         int socket;
         sockaddr_in address;
-        socklen_t len;
         char buffer[DATA_SIZE];
     };
 

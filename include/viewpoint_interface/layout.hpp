@@ -247,8 +247,8 @@ protected:
         bool empty() const;
         uint getNumActiveDisplays() const;
         bool noDisplaysActive() const;
-        uint setActiveLimit(uint limit);
-        uint setNumDisplaysForRole(int num, LayoutDisplayRole role);
+        void setActiveLimit(uint limit);
+        void setNumDisplaysForRole(int num, LayoutDisplayRole role);
         int getPrimaryLimitNum() const { return num_primary_; }
         int getSecondaryLimitNum() const { return num_secondary_; }
         std::map<uint, bool>::const_iterator loopStart() const;

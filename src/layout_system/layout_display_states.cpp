@@ -21,9 +21,9 @@ uint Layout::LayoutDisplayStates::size() const { return states_.size(); }
 bool Layout::LayoutDisplayStates::empty() const { return size() == 0; }
 uint Layout::LayoutDisplayStates::getNumActiveDisplays() const { return num_active_displays_; }
 bool Layout::LayoutDisplayStates::noDisplaysActive() const { return getNumActiveDisplays() == 0; }
-uint Layout::LayoutDisplayStates::setActiveLimit(uint limit) { active_limit_ = limit; }
+void Layout::LayoutDisplayStates::setActiveLimit(uint limit) { active_limit_ = limit; }
 
-uint Layout::LayoutDisplayStates::setNumDisplaysForRole(int num, LayoutDisplayRole role)
+void Layout::LayoutDisplayStates::setNumDisplaysForRole(int num, LayoutDisplayRole role)
 {
     uint role_count(0);
     switch (role)
@@ -279,7 +279,7 @@ void Layout::LayoutDisplayStates::addImageResponseForId(uint display_id, uint gl
 
 uint Layout::LayoutDisplayStates::getImageIdForDisplayId(uint id) const
 {
-    display_ring_.getImageIdForDisplayId(id);
+    return display_ring_.getImageIdForDisplayId(id);
 }
 
 
