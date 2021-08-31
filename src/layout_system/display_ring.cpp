@@ -316,6 +316,22 @@ uint Layout::DisplayRing::getActiveFrameDisplayId() const
     return getDisplayRoleList(LayoutDisplayRole::Primary).at(active_frame_);
 }
 
+uint Layout::DisplayRing::getNextActiveFrameDisplayId() const
+{
+    if (ring_.empty()) {
+        return 0;
+    }
+
+    uint next_frame(active_frame_);
+    ++next_frame;
+    if (next_frame == getNumPrimaryDisplays()) {
+        next_frame = 0;
+    }
+
+    return getDisplayRoleList(LayoutDisplayRole::Primary).at(next_frame);
+}
+
+
 void Layout::DisplayRing::toNextActiveFrame()
 {
     ++active_frame_;

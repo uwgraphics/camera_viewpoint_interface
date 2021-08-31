@@ -216,6 +216,7 @@ protected:
         void setActiveFrameById(uint id);
         uint getActiveFrameIndex() const;
         uint getActiveFrameDisplayId() const;
+        uint getNextActiveFrameDisplayId() const;        
         void toNextActiveFrame();
         void toPrevActiveFrame();
         void addImageResponseForId(uint display_id, uint gl_id);

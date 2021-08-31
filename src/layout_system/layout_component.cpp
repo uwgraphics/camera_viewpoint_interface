@@ -506,42 +506,47 @@ void LayoutComponent::getDoublePiPWindowPositions(ImVec4 &pos) const
 
 void LayoutComponent::drawDoublePiPWindows() const
 {
-    // ImGuiWindowFlags win_flags(0);
-    // win_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
-    // win_flags |= ImGuiWindowFlags_NoTitleBar;
-    // win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+    ImGuiWindowFlags win_flags(0);
+    win_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
+    win_flags |= ImGuiWindowFlags_NoTitleBar;
+    win_flags |= ImGuiWindowFlags_AlwaysAutoResize;
 
-    // ImVec4 windows_pos;
-    // getDoublePiPWindowPositions(windows_pos);
+    ImVec4 windows_pos;
+    getDoublePiPWindowPositions(windows_pos);
+    Layout::DisplayRing& ring(layout_.display_states_.getDisplayRing());
 
-    // ImGui::SetNextWindowPos(ImVec2{windows_pos.x, windows_pos.y}, ImGuiCond_Once);
-    // if (startMenu("Picture-in-Picture 1", win_flags)) {
-    //     if (layout_.secondary_ring_.empty()) { 
-    //         ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "No secondary displays specified.");
-    //         endMenu();
-    //         return;
-    //     }
+    ImGui::SetNextWindowPos(ImVec2{windows_pos.x, windows_pos.y}, ImGuiCond_Once);
+    if (startMenu("Picture-in-Picture 1", win_flags)) {
+        if (ring.getNumSecondaryDisplays() == 0) { 
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "No secondary displays specified.");
+            endMenu();
+            return;
+        }
 
-    //     uint active_id(layout_.secondary_ring_.getActiveFrameDisplayId());
-    //     std::string title(layout_.displays_.getDisplayExternalNameById(active_id));
-    //     ImGui::Text("%s", title.c_str());
-    //     ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(active_id)),
-    //         ImVec2(width_, height_));
-    //     endMenu();
-    // }
+        if (ring.getNumSecondaryDisplays() < 2) { 
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Not enough secondary displays specified.");
+            endMenu();
+            return;
+        }
 
-    // // Since window above returns when there are no secondary displays, it shouldn't be
-    // // necessary to check again
-    // ImGui::SetNextWindowPos(ImVec2{windows_pos.z, windows_pos.w}, ImGuiCond_Once);
-    // if (startMenu("Picture-in-Picture 2", win_flags)) {
-    //     // This will get the active display again if there's only one active
-    //     uint next_id(layout_.secondary_ring_.getNextActiveFrameDisplayId());
-    //     std::string title(layout_.displays_.getDisplayExternalNameById(next_id));
-    //     ImGui::Text("%s", title.c_str());
-    //     ImGui::Image(reinterpret_cast<ImTextureID>(layout_.secondary_ring_.getImageIdForDisplayId(next_id)),
-    //         ImVec2(width_, height_));
-    //     endMenu();
-    // }
+        uint active_id(ring.getDisplayRoleList(LayoutDisplayRole::Secondary).at(0));
+        std::string title(layout_.displays_.getDisplayExternalNameById(active_id));
+        ImGui::Text("%s", title.c_str());
+        ImGui::Image(reinterpret_cast<ImTextureID>(ring.getImageIdForDisplayId(active_id)),
+            ImVec2(width_, height_));
+        endMenu();
+    }
+
+    ImGui::SetNextWindowPos(ImVec2{windows_pos.z, windows_pos.w}, ImGuiCond_Once);
+    if (startMenu("Picture-in-Picture 2", win_flags)) {
+        // This will get the active display again if there's only one active
+        uint next_id(ring.getDisplayRoleList(LayoutDisplayRole::Secondary).at(1));
+        std::string title(layout_.displays_.getDisplayExternalNameById(next_id));
+        ImGui::Text("%s", title.c_str());
+        ImGui::Image(reinterpret_cast<ImTextureID>(ring.getImageIdForDisplayId(next_id)),
+            ImVec2(width_, height_));
+        endMenu();
+    }
 }
 
 } // viewpoint_interface

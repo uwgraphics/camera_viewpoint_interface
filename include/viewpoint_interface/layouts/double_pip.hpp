@@ -22,10 +22,11 @@ public:
     {
         setNumDisplaysForRole(1, LayoutDisplayRole::Primary);
         setNumDisplaysForRole(2, LayoutDisplayRole::Secondary);
+        toNextDisplay(LayoutDisplayRole::Secondary);
 
-        addDisplayByIxAndRole(parameters_.start_primary_display, LayoutDisplayRole::Primary);
-        addDisplayByIxAndRole(parameters_.first_pip_display, LayoutDisplayRole::Secondary);
-        addDisplayByIxAndRole(parameters_.second_pip_display, LayoutDisplayRole::Secondary);
+        // addDisplayByIxAndRole(parameters_.start_primary_display, LayoutDisplayRole::Primary);
+        // addDisplayByIxAndRole(parameters_.first_pip_display, LayoutDisplayRole::Secondary);
+        // addDisplayByIxAndRole(parameters_.second_pip_display, LayoutDisplayRole::Secondary);
     }
 
     virtual void displayLayoutParams() override
@@ -57,14 +58,14 @@ public:
                 case GLFW_KEY_UP:
                 {
                     toNextDisplay(LayoutDisplayRole::Primary);
-                    toNextDisplayWithPush(LayoutDisplayRole::Secondary);
+                    toNextDisplay(LayoutDisplayRole::Secondary);
                 } break;
 
                 case GLFW_KEY_LEFT:
                 case GLFW_KEY_DOWN:
                 {
                     toPrevDisplay(LayoutDisplayRole::Primary);
-                    toPrevDisplayWithPush(LayoutDisplayRole::Secondary);
+                    toPrevDisplay(LayoutDisplayRole::Secondary);
                 } break;
 
                 default:

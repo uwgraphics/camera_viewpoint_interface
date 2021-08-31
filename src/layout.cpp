@@ -307,18 +307,6 @@ void Layout::toPrevDisplay(LayoutDisplayRole role)
     display_states_.toPrevDisplay(role);
 }
 
-void Layout::toNextDisplayWithPush(LayoutDisplayRole role)
-{
-    // TODO: These should push secondaries as well
-    display_states_.toNextDisplay(role);
-}
-
-void Layout::toPrevDisplayWithPush(LayoutDisplayRole role)
-{
-    // TODO:
-    display_states_.toPrevDisplay(role);
-}
-
 void Layout::addImageRequestToQueue(DisplayImageRequest request)
 {
     display_image_queue_.push_back(request);
