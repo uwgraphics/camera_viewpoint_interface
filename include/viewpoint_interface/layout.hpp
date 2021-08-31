@@ -350,8 +350,6 @@ protected:
     void deactivateDisplayAtIx(uint ix);
     void toNextDisplay(LayoutDisplayRole role);
     void toPrevDisplay(LayoutDisplayRole role);
-    void toNextDisplayWithPush(LayoutDisplayRole role);
-    void toPrevDisplayWithPush(LayoutDisplayRole role);
     void addImageRequestToQueue(DisplayImageRequest request);
     void addLayoutComponent(LayoutComponent::Type type, LayoutComponent::Spacing spacing=LayoutComponent::Spacing::Auto,
         LayoutComponent::Positioning positioning=LayoutComponent::ComponentPositioning_Auto, float width=0.0,
