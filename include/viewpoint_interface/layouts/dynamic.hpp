@@ -35,7 +35,7 @@ public:
         std::map<std::string, bool> states;
         states["Robot"] = !clutching_;
         states["Suction"] = grabbing_;
-        displayStateValues(states);
+        // displayStateValues(states);
     }
 
     virtual void handleStringInput(std::string input) override

@@ -1,0 +1,10 @@
+{
+    "cam0": {
+        "internal_name": "kinect",
+        "external_name": "Kinect",
+        "topic": "/rgb/image_raw",
+        "width": 2048,
+        "height": 1536,
+        "channels": 3
+    }
+}

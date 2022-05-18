@@ -201,7 +201,9 @@ bool App::initializeGlfw()
         win_height = app_params_.WINDOW_HEIGHT;
     }
 
-    window_ = glfwCreateWindow(win_width, win_height, "HRI Study", NULL, NULL);
+    win_width = 1320;
+    win_height = 990;
+    window_ = glfwCreateWindow(win_width, win_height, "Periscope Demo", NULL, NULL);
     if (!window_) {
         printText("Could not create window.");
         return false;
@@ -546,10 +548,10 @@ void App::cameraImageCallback(const sensor_msgs::ImageConstPtr& msg, uint id)
         return;
     }
 
-    cv::Mat unflipped_mat;
-    cv::flip(cur_img->image, unflipped_mat, 0);
+    // cv::Mat unflipped_mat;
+    // cv::flip(cur_img->image, unflipped_mat, 0);
 
-    layouts_.forwardImageForDisplayId(id, unflipped_mat);
+    layouts_.forwardImageForDisplayId(id, cur_img->image);
 }
 
 void App::cameraMatrixCallback(const std_msgs::Float32MultiArrayConstPtr& msg, uint id)
